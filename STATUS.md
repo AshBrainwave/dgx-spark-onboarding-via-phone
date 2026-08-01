@@ -2,7 +2,7 @@
 
 **Overall:** in_progress
 **Current step:** 4 — App screens against mock
-**Updated:** 2026-08-01T00:00:00Z
+**Updated:** 2026-08-01T06:47:43Z
 
 ## Milestones
 - [x] 1. Repo skeleton + CI
@@ -20,10 +20,10 @@
 - Added transport-agnostic mock HTTP agent and framing test coverage (`b9df34a`)
 - Added simulator enrollment QR PNG and terminal rendering (`f551850`)
 - Added actionable simulator error copy (`e661660`)
-- Added X25519/HKDF/AES-GCM protocol primitives and Python round-trip coverage (pending commit)
+- Added X25519/HKDF/AES-GCM protocol primitives and Python round-trip coverage (`5ea944f`)
+- Configured verified GitHub SSH access and pushed `main` (`5ea944f`)
 
 ## Blocked
-- GitHub push is blocked: `git push -u origin main` received HTTP 403 for `AshBrainwave`. Local commits continue normally.
 - Hosted deployment destination, account binding, and physical QR/display details need owner answers. A real DGX Spark is available for validation after the simulator milestones.
 
 ## Decisions I made that the spec didn't cover
