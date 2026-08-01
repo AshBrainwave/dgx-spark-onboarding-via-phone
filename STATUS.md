@@ -1,14 +1,14 @@
 # DGX Spark Onboarding — Build Status
 
 **Overall:** in_progress
-**Current step:** Hardware bring-up — waiting for the Spark SSH target; Mac-side work continues
-**Updated:** 2026-08-01T22:55:20Z
+**Current step:** Part A1 — survey NetworkManager, AP+STA capability, Bluetooth, and port ownership
+**Updated:** 2026-08-01T23:04:33Z
 
 ## Verification matrix
 
 | Verified on hardware | Verified in simulation only | Deferred (no Android) |
 | --- | --- | --- |
-| Mac CoreBluetooth permission/preflight: 19 BLE advertisers detected. The Spark itself is not yet advertising. | Protocol crypto/framing, mock driver, portal probes/DNS, app FSM/screens/error routes, simulator, NetworkManager/SoftAP implementation, BlueZ bridge, mDNS publisher, handoff recovery, lifecycle/reset logic, BLE central probe framing/codec self-test. | Chrome Web Bluetooth chooser, user-gesture handling, Location Services prompt, Chrome reconnect/service-cache behaviour, and Android SoftAP fallback/`.local` resolution. |
+| Spark aarch64/Python 3.12 portability gate (14 tests and lint); Mac CoreBluetooth permission/preflight (19 BLE advertisers). The Spark itself is not yet advertising. | Protocol crypto/framing, mock driver, portal probes/DNS, app FSM/screens/error routes, simulator, NetworkManager/SoftAP implementation, BlueZ bridge, mDNS publisher, handoff recovery, lifecycle/reset logic, BLE central probe framing/codec self-test. | Chrome Web Bluetooth chooser, user-gesture handling, Location Services prompt, Chrome reconnect/service-cache behaviour, and Android SoftAP fallback/`.local` resolution. |
 
 ## Milestones
 - [x] 1. Repo skeleton + CI — clean-clone Python and browser test commands passed
@@ -21,6 +21,8 @@
 - [ ] 8. Hardware networking (`v0.4-hw`)
 
 ## Done since last update
+- Established non-interactive SSH to `nbutme@192.168.68.87`: `spark-0268`, Ubuntu 24.04.4 LTS, aarch64, kernel `6.17.0-1029-nvidia`.
+- Cloned pushed commit `76f39cb` onto the Spark over HTTPS, confirmed the authoritative spec SHA-256, installed `agent[dev]` into a repository-local Python 3.12.3 venv, and passed Spark-side lint plus all 14 tests.
 - Restored GitHub push access by switching this Mac checkout from the unauthorized HTTPS identity (`mash-falcon`) to the existing SSH identity (`AshBrainwave`); pushed `main` through `fdd05bf`.
 - Added the reusable macOS `bleak` central probe for advertising, GATT properties, real-MTU framing, timeout NAKs, encrypted provisioning, and truncated ciphertext. Its framing/codec self-test passes; CoreBluetooth detected 19 nearby BLE devices, proving macOS permission is active. Full Spark-side C1–C5 remains unrun until deployment.
 - Replaced the 35-line condensed `docs/SPEC.md` with the byte-identical 631-line authoritative build specification (`892edd4`).
@@ -51,11 +53,9 @@
 
 ## Blocked
 - Nothing blocks simulator work.
-- Spark deployment and hardware Parts A/D are waiting for the operator to provide a key-authenticated `user@hostname` or `user@IP` SSH target.
 - Spark-side BLE advertising/GATT validation requires the agent to be deployed and advertising. The Mac side is ready and its CoreBluetooth permission is verified; no Android device is needed for Part C.
-- Hardware-networking validation requires the Spark SSH target, NetworkManager, and its Wi-Fi radio. D-Bus activation, SoftAP, DNS, mDNS, and handoff behavior remain unrun.
+- Hardware-networking D-Bus activation, SoftAP, DNS, mDNS, and handoff behavior remain unrun pending the A1 survey.
 - The physical reset implementation needs the Spark carrier-board GPIO chip/line and an actual button press for validation. Real BlueZ advertising/GATT, NetworkManager AP+STA capability discovery, AP recovery, Avahi, and D-Bus networking validation remain blocked by this host's lack of Bluetooth and Wi-Fi hardware.
-- Hardware bring-up cannot start from this workspace because no Spark hostname/IP or remote shell connection has been configured. The Mac/iPhone/Spark operator steps in the hardware brief require execution at those devices.
 
 ## Decisions I made that the spec didn't cover
 - The simulator starts with HTTP on `localhost:8080`; production SoftAP uses NetworkManager shared mode when hardware mode is selected.
