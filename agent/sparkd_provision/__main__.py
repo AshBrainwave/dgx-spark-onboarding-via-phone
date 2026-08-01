@@ -9,6 +9,7 @@ from sparkd_provision.net.mdns import MdnsPublisher
 from sparkd_provision.net.mock_driver import MockDriver
 from sparkd_provision.net.nm_driver import NetworkManagerDriver
 from sparkd_provision.portal.server import create_app
+from sparkd_provision.reset_button import GpiodResetButton
 from sparkd_provision.state import StateStore
 
 
@@ -21,10 +22,14 @@ def main() -> None:
     parser.add_argument("--bluetooth-adapter", default="/org/bluez/hci0")
     parser.add_argument("--no-ble", action="store_true", help="Do not export the BlueZ provisioning GATT service")
     parser.add_argument("--state-path", type=Path, help="State file (default: /var/lib/sparkd-provision/state.json in hardware mode)")
+    parser.add_argument("--reset-gpio-chip", help="GPIO chip for the active-low physical reset button, for example /dev/gpiochip0")
+    parser.add_argument("--reset-gpio-line", type=int, help="GPIO line offset for the physical reset button")
     args = parser.parse_args()
     host = args.host or ("127.0.0.1" if args.mock else "0.0.0.0")
     state_path = args.state_path or (None if args.mock else Path("/var/lib/sparkd-provision/state.json"))
     state = StateStore(state_path)
+    if (args.reset_gpio_chip is None) != (args.reset_gpio_line is None):
+        parser.error("--reset-gpio-chip and --reset-gpio-line must be provided together")
 
     async def runtime_app() -> web.Application:
         mdns = None
@@ -43,6 +48,17 @@ def main() -> None:
                 mdns = None
         handlers = Handlers(driver, state, mdns)
         app = create_app(handlers)
+        if args.reset_gpio_chip is not None:
+            button = GpiodResetButton.create(
+                args.reset_gpio_chip, args.reset_gpio_line, handlers.factory_reset
+            )
+            button.start()
+            app["reset_button"] = button
+
+            async def close_reset(_: web.Application) -> None:
+                await button.close()
+
+            app.on_cleanup.append(close_reset)
         if not args.mock and not args.no_ble:
             peripheral = await BluezPeripheral.create(handlers, args.bluetooth_adapter)
             await peripheral.start()

@@ -23,6 +23,13 @@ and uses a twelve-character password from an unambiguous alphabet. Provisioning 
 fifteen minutes and a factory reset reopens the window and rotates AP credentials. The
 systemd unit and first-boot installer live in `deploy/` and `scripts/`.
 
+For carrier boards with a physical reset input, run with both `--reset-gpio-chip` and
+`--reset-gpio-line`. The active-low, pull-up GPIO watcher uses libgpiod and factory-resets
+the lifecycle: it cancels an in-flight handoff, clears the claim, reopens the fifteen-minute
+window, rotates AP credentials, and restores the provisioning AP. The exact GPIO line is a
+board integration value and must not be guessed. Install the package with the `hardware`
+extra on appliance images.
+
 The implementation still needs validation with a DGX Spark radio, physical reset button,
 Android Chrome, and supported NetworkManager environment before any hardware milestone can
 be marked complete.

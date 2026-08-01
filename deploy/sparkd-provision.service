@@ -6,6 +6,8 @@ Wants=NetworkManager.service
 [Service]
 Type=simple
 User=root
+# Set the two reset arguments in a systemd drop-in after confirming the carrier-board
+# wiring, for example: --reset-gpio-chip /dev/gpiochip0 --reset-gpio-line 23
 ExecStart=/usr/bin/sparkd-provision --interface wlan0
 Restart=on-failure
 RestartSec=3

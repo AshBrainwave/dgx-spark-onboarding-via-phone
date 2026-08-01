@@ -22,6 +22,7 @@ from sparkd_provision.protocol.crypto import (
     unb64url,
 )
 from sparkd_provision.protocol.framing import Reassembler, fragment
+from sparkd_provision.state import StateStore
 
 
 async def test_mock_driver_accepts_every_documented_wifi_failure(monkeypatch) -> None:
@@ -234,3 +235,21 @@ async def test_non_concurrent_connect_sends_handoff_before_dropping_ap(monkeypat
     assert result["body"]["handoff"]["mdns_name"] == "dgx-spark-0001.local"
     assert result["body"]["handoff"]["claim_token"]
     assert driver.ap_down_calls == 1
+
+
+async def test_factory_reset_reopens_window_rotates_ap_and_restores_recovery_ap(tmp_path) -> None:
+    state_path = tmp_path / "state.json"
+    state = StateStore(state_path)
+    old_password = state.state.ap_psk
+    state.claim("old-owner")
+    driver = MockDriver()
+    handlers = Handlers(driver, state)
+
+    await handlers.factory_reset()
+
+    assert state.provisioning_open
+    assert state.state.claimed is False
+    assert state.state.owner_token_hash is None
+    assert state.state.ap_psk != old_password
+    assert driver.ap_up_calls == 1
+    assert state_path.stat().st_mode & 0o777 == 0o600

@@ -17,11 +17,13 @@ reassembly safe to report as a protocol error.
 
 ## Provisioning lifecycle
 
-Hardware mode persists only non-secret lifecycle state in
-`/var/lib/sparkd-provision/state.json` with mode `0600`: the provisioning-window timestamp,
-claim status, SHA-256 owner-token digest, device name, and current SoftAP name/password.
-The PSK is never written here. The window lasts fifteen minutes and factory reset reopens it
-and rotates the twelve-character SoftAP password from an unambiguous alphabet.
+Hardware mode persists lifecycle state in `/var/lib/sparkd-provision/state.json` with mode
+`0600`: the provisioning-window timestamp, claim status, SHA-256 owner-token digest, device
+name, and current SoftAP name/password. The home-network PSK is never written here; the AP
+credential is required to restore a recoverable provisioning AP after reboot. The window
+lasts fifteen minutes and factory reset reopens it and rotates the twelve-character SoftAP
+password from an unambiguous alphabet. A configured active-low libgpiod reset button invokes
+that same factory-reset operation, with one-second debounce.
 
 The first `session.open` holds a 90-second single-claimer lock. A session releases it when
 the Wi-Fi attempt reaches a failed status or it idles out. Each session permits five

@@ -18,6 +18,15 @@ Hardware mode starts the BlueZ peripheral on `/org/bluez/hci0` by default; deplo
 select another adapter with `--bluetooth-adapter`. `--no-ble` is an intentional diagnostic
 escape hatch for a networking-only appliance image, not the normal provisioning path.
 
+## Physical reset
+
+Physical reset is enabled only when both `--reset-gpio-chip` and `--reset-gpio-line` are
+provided by the carrier-board integration. It uses the optional libgpiod v2 binding with an
+active-low pull-up input and one-second debounce. A press performs the same recovery-safe
+factory reset as the API: it clears the claim/session, rotates the SoftAP password, reopens
+the 15-minute window, and makes the AP available again. The GPIO line must be confirmed on
+the target board; the service intentionally does not guess it.
+
 ## NetworkManager ownership
 
 Hardware mode uses NetworkManager's system D-Bus API through `dbus-fast`, never parsed

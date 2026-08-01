@@ -17,8 +17,9 @@ Open the Vite URL printed by the script. Set `SPARK_SIM_FAIL` to an error scenar
 
 ## Reset and recovery
 
-The PoC re-advertises after a failed connection. On hardware, press the physical reset
-button to reopen the provisioning window after it has expired.
+The PoC re-advertises after a failed connection. On hardware, configure the carrier-board
+button with `--reset-gpio-chip /dev/gpiochipN --reset-gpio-line N` (and install the
+`hardware` package extra); pressing it reopens the provisioning window after it has expired.
 
 See [the build status](STATUS.md) and [the specification](docs/SPEC.md).
 

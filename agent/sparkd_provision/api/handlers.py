@@ -144,11 +144,21 @@ class Handlers:
             self.state.save()
             return response(message_id, {"name": self.state.state.name})
         if op == "device.factory_reset":
-            self._release_session()
-            self.state.reset()
-            await self.driver.forget()
+            await self.factory_reset()
             return response(message_id, {})
         return error(message_id, "UNKNOWN_OPERATION")
+
+    async def factory_reset(self) -> None:
+        """Return to a recoverable provisioning AP after an authenticated or physical reset."""
+        if self._handoff_task:
+            self._handoff_task.cancel()
+            self._handoff_task = None
+        self._release_session()
+        self.state.reset()
+        await self.driver.forget()
+        # This is intentionally independent of AP+STA capability: after a reset the
+        # device must be discoverable even when its old LAN profile has disappeared.
+        await self.driver.softap_up(self.state.state.ap_ssid, self.state.state.ap_psk)
 
     async def provisioning_online(self) -> bool:
         return (await self.driver.status()).phase == "online"
