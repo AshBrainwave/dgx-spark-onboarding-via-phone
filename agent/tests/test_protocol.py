@@ -13,7 +13,11 @@ from sparkd_provision.config import DeviceIdentity
 from sparkd_provision.net import mock_driver
 from sparkd_provision.net.capabilities import supports_concurrent_ap_sta
 from sparkd_provision.net.mock_driver import MockDriver
-from sparkd_provision.net.nm_driver import _deduplicate_networks, _network_from_properties
+from sparkd_provision.net.nm_driver import (
+    _deduplicate_networks,
+    _network_from_properties,
+    _ssid_variant,
+)
 from sparkd_provision.portal.dns import answer_a_query
 from sparkd_provision.protocol.crypto import (
     b64url,
@@ -276,6 +280,7 @@ def test_real_networkmanager_scan_shapes_are_normalized() -> None:
     assert enterprise.unsupported is True
     assert hidden.ssid == ""
     assert hidden.security == "wpa2-psk"
+    assert _ssid_variant("Droid").value == b"Droid"
 
 
 def test_hardware_identity_drives_radio_and_handoff_names(tmp_path) -> None:

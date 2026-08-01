@@ -1,8 +1,8 @@
 # DGX Spark Onboarding — Build Status
 
 **Overall:** in_progress
-**Current step:** Part A2 — blocked on non-interactive privilege for NetworkManager/system installation
-**Updated:** 2026-08-01T23:28:50Z
+**Current step:** Part A2 — retest SoftAP after real D-Bus byte-array fix
+**Updated:** 2026-08-01T23:31:19Z
 
 ## Verification matrix
 
@@ -21,6 +21,8 @@
 - [ ] 8. Hardware networking (`v0.4-hw`)
 
 ## Done since last update
+- First A2 activation failed safely before changing the radio: `dbus-fast` 5 rejected a Python `list[int]` for D-Bus signature `ay` (`SignatureBodyMismatchError`, requires `bytes`). Fixed both STA and SoftAP SSID construction behind a tested helper; the recovery timer was cancelled and `Droid_IoT` remained active.
+- Root hardware identity discovery exposed the real platform serial `1983825003847`; hardware naming therefore uses suffix `3847` (`DGX-Spark-3847`), while unprivileged discovery correctly falls back to hostname.
 - Fixed simulator identity leaking into hardware before A2: hardware mode now derives identity from `SPARK_SERIAL`, platform serial files, or hostname; `spark-0268` therefore drives AP name `DGX-Spark-0268`, BLE suffix `0268`, and mDNS name `dgx-spark-0268.local`, including after reset. Mac lint and all 17 tests pass.
 - Verified A4 normalization on the Spark at `456d963`: lint and all 16 tests pass on aarch64; 33 entries normalize to 16 unique named SSIDs plus 17 hidden BSSIDs; `Droid` correctly aggregates 2.4/5/6 GHz and reports WPA3-SAE; 802.1X is explicitly unsupported. Forced scan and raw-dBm accuracy remain unverified.
 - A4 read-only hardware comparison found that the original D-Bus scan emitted duplicate BSSIDs, lost hidden BSSIDs and multi-band information, mislabeled 6 GHz/WPA3/802.1X, and treated NetworkManager quality percent as dBm. Fixed scan normalization using the real Spark flag/frequency shapes, added WPA3 SAE connection selection, and added regression coverage; Mac lint and all 16 tests pass.
@@ -60,14 +62,13 @@
 
 ## Blocked
 - Nothing blocks simulator work.
-- Hardware mutation is blocked for this orchestrated SSH session: `sudo -n true` requires a password, and `nmcli general permissions` reports `auth`/`no` for scan, network control, protected sharing, and connection modification. A2 cannot safely activate a SoftAP and systemd/BlueZ/GPIO assets cannot be installed until `nbutme` has non-interactive privilege for this pass.
 - Spark-side BLE advertising/GATT validation requires the agent to be deployed and advertising. The Mac side is ready and its CoreBluetooth permission is verified; no Android device is needed for Part C.
 - Hardware-networking D-Bus activation, SoftAP, DNS, mDNS, and handoff behavior remain unrun pending non-interactive privilege.
 - A4 forced rescan and exact RSSI validation remain blocked on privilege. NetworkManager exposes scan `Strength` as quality percent, not raw dBm; the corrected driver reports a conventional estimate until a raw NL80211 RSSI source is implemented and verified.
 - The physical reset implementation needs the Spark carrier-board GPIO chip/line and an actual button press for validation. Real BlueZ advertising/GATT, AP recovery, Avahi publishing, and mutating D-Bus networking validation remain unrun.
 
 ## Decisions I made that the spec didn't cover
-- The Spark exposes model `NVIDIA_DGX_Spark` but no readable DMI/device-tree serial. Hardware identity therefore falls back to hostname `spark-0268` unless `SPARK_SERIAL` is supplied by the image; this preserves the observed chassis suffix without inventing a serial.
+- The platform serial file is root-readable and contains `1983825003847`; hardware service identity uses it. Unprivileged tools fall back to hostname `spark-0268`, and `SPARK_SERIAL` remains the explicit image override.
 - Preserved the protocol's `rssi` field by converting NetworkManager quality percent to an explicitly documented estimate (`quality / 2 - 100`) rather than continuing to mislabel `quality - 100` as real dBm. This remains a known spec gap pending raw NL80211 data.
 - Used the complete `iw phy` output for the A1 gate because the hardware plan's suggested `sed` range stops after the first combination and hides the second, AP-capable combination.
 - The simulator starts with HTTP on `localhost:8080`; production SoftAP uses NetworkManager shared mode when hardware mode is selected.

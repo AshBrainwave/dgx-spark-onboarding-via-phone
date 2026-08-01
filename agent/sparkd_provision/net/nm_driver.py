@@ -123,6 +123,10 @@ def _variant(signature: str, value: Any) -> Variant:
     return Variant(signature, value)
 
 
+def _ssid_variant(ssid: str) -> Variant:
+    return _variant("ay", ssid.encode())
+
+
 class NetworkManagerDriver(NetDriver):
     def __init__(self, bus: MessageBus, device_path: str, interface: str) -> None:
         self.bus = bus
@@ -230,7 +234,7 @@ class NetworkManagerDriver(NetDriver):
         if security == "wpa2-enterprise":
             raise NetworkManagerError("802.1X is not supported by this provisioning flow")
         self._status = LinkStatus(phase="associating", ssid=ssid)
-        wifi: dict[str, Variant] = {"ssid": _variant("ay", list(ssid.encode()))}
+        wifi: dict[str, Variant] = {"ssid": _ssid_variant(ssid)}
         if hidden:
             wifi["hidden"] = _variant("b", True)
         settings: dict[str, dict[str, Variant]] = {
@@ -313,7 +317,7 @@ class NetworkManagerDriver(NetDriver):
                 "type": _variant("s", "802-11-wireless"),
             },
             "802-11-wireless": {
-                "ssid": _variant("ay", list(ssid.encode())),
+                "ssid": _ssid_variant(ssid),
                 "mode": _variant("s", "ap"),
                 "band": _variant("s", "bg"),
             },
