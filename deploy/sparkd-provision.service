@@ -1,0 +1,16 @@
+[Unit]
+Description=DGX Spark phone provisioning service
+After=NetworkManager.service
+Wants=NetworkManager.service
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/sparkd-provision --interface wlan0
+Restart=on-failure
+RestartSec=3
+StateDirectory=sparkd-provision
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

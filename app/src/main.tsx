@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { Client, ProtocolError } from "./protocol/client";
 import type { Network } from "./protocol/messages";
 import { HttpTransport } from "./transport/http";
+import { BleTransport, shouldUseBle } from "./transport/ble";
 import { Applying } from "./screens/Applying";
 import { ChooseNetwork } from "./screens/ChooseNetwork";
 import { Connecting } from "./screens/Connecting";
@@ -16,6 +17,7 @@ import { Welcome } from "./screens/Welcome";
 import "./style.css";
 
 const client = new Client(new HttpTransport());
+const bleTransport = new BleTransport();
 type Screen = "welcome" | "qr" | "join" | "connecting" | "networks" | "password" | "applying" | "reconnect" | "success" | "error";
 const knownError = (value: string): ErrorCode => value in errorCopy ? value as ErrorCode : "PORTAL_UNREACHABLE";
 
@@ -31,17 +33,28 @@ function App() {
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState<ErrorCode>(knownError(devError ?? "PORTAL_UNREACHABLE"));
   const [ip, setIp] = useState("");
+  const [connectingTransport, setConnectingTransport] = useState<"BLE" | "portal">("portal");
   const concurrent = params.get("concurrent") !== "0";
   const selectedSsid = selected?.ssid ?? "Hidden network";
   const fail = (reason: unknown) => { setError(knownError(reason instanceof ProtocolError ? reason.code : "PORTAL_UNREACHABLE")); setScreen("error"); };
   const onQrParsed = () => {
     const ios = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    if (!ios && "bluetooth" in navigator) openAndScan();
+    if (!ios && shouldUseBle()) {
+      setConnectingTransport("BLE");
+      setScreen("connecting");
+    }
     else setScreen("join");
   };
-  async function openAndScan() {
+  async function openAndScan(useBle = false) {
     setScreen("connecting");
     try {
+      if (useBle) {
+        // Called from Connecting's button handler; requestDevice requires this gesture.
+        await bleTransport.chooseDevice();
+        client.setTransport(bleTransport);
+      } else {
+        client.setTransport(new HttpTransport());
+      }
       const info = await client.call("device.info");
       const qrPubkey = params.get("pubkey") ?? String(info.pubkey);
       await client.open(qrPubkey);
@@ -77,8 +90,8 @@ function App() {
     switch (route) {
       case "welcome": return <Welcome onScan={() => setScreen("qr")} />;
       case "qr": return <QrScanner onParsed={onQrParsed} />;
-      case "join": return <JoinAp onJoined={openAndScan} />;
-      case "connecting": return <Connecting transport="portal" />;
+      case "join": return <JoinAp onJoined={() => openAndScan(false)} />;
+      case "connecting": return <Connecting transport={connectingTransport} onContinue={() => openAndScan(connectingTransport === "BLE")} />;
       case "networks": return <ChooseNetwork networks={networks.length ? networks : demoNetworks} scannedAt={scannedAt} onChoose={n => { setSelected(n); setScreen("password"); }} onRefresh={refresh} onOther={() => { setSelected(null); setScreen("password"); }} />;
       case "password": return <Password ssid={selectedSsid} onSubmit={connect} />;
       case "applying": return <Applying phase={phase} elapsed={elapsed} />;

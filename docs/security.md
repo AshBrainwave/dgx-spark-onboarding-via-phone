@@ -14,3 +14,16 @@ Out of scope: hardware attestation, portal TLS, and cloud account binding.
 Malformed or stale AES-GCM ciphertext (including a key rotation between retries) returns
 `INVALID_CIPHERTEXT`; it must never escape as an HTTP 500. This also makes truncated BLE
 reassembly safe to report as a protocol error.
+
+## Provisioning lifecycle
+
+Hardware mode persists only non-secret lifecycle state in
+`/var/lib/sparkd-provision/state.json` with mode `0600`: the provisioning-window timestamp,
+claim status, SHA-256 owner-token digest, device name, and current SoftAP name/password.
+The PSK is never written here. The window lasts fifteen minutes and factory reset reopens it
+and rotates the twelve-character SoftAP password from an unambiguous alphabet.
+
+The first `session.open` holds a 90-second single-claimer lock. A session releases it when
+the Wi-Fi attempt reaches a failed status or it idles out. Each session permits five
+`wifi.connect` attempts, with 0/1/3/7/15-second retry gates; extra calls return
+`RATE_LIMITED` and premature retries return `RETRY_BACKOFF`.

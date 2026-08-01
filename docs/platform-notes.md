@@ -24,3 +24,7 @@ intentional: provisioning must not race netplan or another network manager for t
 The SoftAP profile uses NetworkManager AP mode, WPA2, a 2.4 GHz `bg` band, and
 `ipv4.method=shared`; NetworkManager then supplies DHCP and NAT. Hardware validation is
 required before claiming this profile works on a specific radio.
+
+At startup hardware mode creates (or restores) the AP from persisted state. Its WPA2 password
+is twelve characters from an alphabet excluding ambiguous `0/O` and `1/I/l`; it runs on the
+2.4 GHz `bg` band with NetworkManager shared IPv4. State storage is mode `0600`.

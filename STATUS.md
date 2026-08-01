@@ -1,8 +1,8 @@
 # DGX Spark Onboarding — Build Status
 
 **Overall:** in_progress
-**Current step:** 7 — BLE hardware validation is blocked; continuing hardware-networking implementation
-**Updated:** 2026-08-01T21:51:00Z
+**Current step:** 7 — BLE hardware validation is blocked; browser transport and device lifecycle implementation added
+**Updated:** 2026-08-01T21:56:00Z
 
 ## Milestones
 - [x] 1. Repo skeleton + CI — clean-clone Python and browser test commands passed
@@ -34,11 +34,13 @@
 - Fresh temporary clone launch succeeded: it created a new Python venv, installed dependencies, printed QR PNG/ASCII, and served the simulator. Browser BLE framing loopback tests now pass (8 browser tests total).
 - Verified all documented simulator Wi-Fi error codes directly and as `?screen=error&error=<CODE>` review routes; Python tests: 9 passed, browser tests: 8 passed, typecheck/build passed. Tagged and pushed `v0.1-sim` and `v0.2-errors` (`22158e6`).
 - Added the production NetworkManager D-Bus driver (`dbus-fast`), including startup ownership detection, access-point scan, WPA2 profile activation, and a 2.4 GHz shared SoftAP profile. Lint, 9 Python tests, 8 browser tests, and TypeScript typecheck passed (`8d001f5`).
+- Added durable provisioning lifecycle state, first-boot systemd assets, claim/window/backoff enforcement, real NetworkManager IPv4 status extraction, and a browser Web Bluetooth GATT transport. Python lint/tests (9 passed), browser typecheck/tests (8 passed), and build passed (pending commit).
 
 ## Blocked
 - Nothing blocks simulator work.
 - BLE validation requires the real Spark, a BlueZ-capable Linux Bluetooth adapter, and an Android phone. This workspace's `bluetoothctl show` fails with `Unable to open mgmt_socket`; no usable adapter is present.
 - Hardware-networking validation requires the Spark, NetworkManager, and a supported Wi-Fi radio. None is available in this workspace, so D-Bus activation, SoftAP, DNS, mDNS, and handoff behavior cannot yet be run.
+- The physical-reset GPIO wiring, BlueZ GATT peripheral, Avahi publisher, runtime AP+STA capability detection, and handoff/recovery path are not yet implemented. They need a Spark-specific hardware interface and cannot be responsibly guessed from this radio-less host.
 
 ## Decisions I made that the spec didn't cover
 - The simulator starts with HTTP on `localhost:8080`; production SoftAP uses NetworkManager shared mode when hardware mode is selected.
@@ -46,6 +48,7 @@
 
 ## Next
 - Implement the actual Web Bluetooth GATT transport (request-device gesture, advertised service filter, characteristics, gzip/base64url framing, reconnect) and BLE peripheral, then validate against Android Chrome and the real Spark (Priority 6). The radio-free framing loopback is already tested.
-- Complete and unit-test the NetworkManager driver: map NM connection states to all Wi-Fi errors, report real IPv4 details, make SoftAP credentials/channel lifecycle persistent, add mDNS, and connect captive-probe/DNS behavior to the AP address (Priority 7). Validate on a supported radio when available.
-- Implement runtime AP+STA handoff and recovery behavior (Priority 8).
-- Implement persistent first-boot/systemd provisioning lifecycle, physical reset, claim lock, and rate limits (Priority 9).
+- Implement the Linux BlueZ GATT peripheral (advertisement UUID/name, CTRL RX/TX/INFO, ten-second NAK handling) and validate it with Android Chrome and the real Spark (Priority 6). The browser transport is implemented; validation remains blocked by hardware.
+- Complete and unit-test the NetworkManager driver: map NM state reasons to the full Wi-Fi taxonomy, add Avahi mDNS, connect DNS/captive behavior to the AP address, and validate profile persistence/status on a supported radio (Priority 7).
+- Implement runtime wiphy AP+STA detection, non-concurrent handoff/recovery within 20 seconds, mDNS/IP-sweep client reconnection, and test on hardware (Priority 8).
+- Implement the physical-reset GPIO integration and validate systemd first-boot/state recovery/claim-lock/rate-limit behavior on the Spark (Priority 9).

@@ -23,3 +23,14 @@ service-UUID list; it is not sufficient to expose it after connect.
 
 The browser suite includes a radio-free `LoopbackTransport` that fragments and reassembles
 real request envelopes. It is the required first framing validation before Android hardware.
+
+## GATT UUIDs
+
+The one random 128-bit service UUID is `a66a068e-b4b7-4df6-a00d-7e2c04a36f26`.
+`CTRL_RX` is `a66a068f-b4b7-4df6-a00d-7e2c04a36f26` (write without response), `CTRL_TX` is
+`a66a0690-b4b7-4df6-a00d-7e2c04a36f26` (notify), and `INFO` is
+`a66a0691-b4b7-4df6-a00d-7e2c04a36f26` (read-only, unencrypted). The peripheral must put
+the service UUID in the advertising service-UUID list and advertise as `DGX Spark <last4>`.
+
+Incomplete frames are dropped after ten seconds. The receiver should NAK the message ID;
+the browser request also times out at ten seconds so it never hangs indefinitely.

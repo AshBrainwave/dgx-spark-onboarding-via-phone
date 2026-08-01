@@ -21,3 +21,10 @@ The PoC re-advertises after a failed connection. On hardware, press the physical
 button to reopen the provisioning window after it has expired.
 
 See [the build status](STATUS.md) and [the specification](docs/SPEC.md).
+
+## Hardware installation
+
+Install the Python package and run `scripts/first-boot.sh` on the Spark image. The included
+unit expects the Wi-Fi radio to be named `wlan0`; override the unit's `ExecStart` with the
+NetworkManager-owned interface name when it differs. Device lifecycle data is in
+`/var/lib/sparkd-provision/state.json` and is restricted to mode 0600.

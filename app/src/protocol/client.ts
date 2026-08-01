@@ -20,7 +20,11 @@ export class Client {
   private sessionKey: CryptoKey | null = null;
   private counter = 0;
 
-  constructor(private readonly transport: Transport) {}
+  constructor(private transport: Transport) {}
+
+  setTransport(transport: Transport) {
+    this.transport = transport;
+  }
 
   async call(op: string, body: Record<string, unknown> = {}) {
     const result = await this.transport.request({
