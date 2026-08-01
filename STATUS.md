@@ -1,16 +1,16 @@
 # DGX Spark Onboarding — Build Status
 
 **Overall:** in_progress
-**Current step:** 5 — Simulator completion
-**Updated:** 2026-08-01T21:43:00Z
+**Current step:** 7 — BLE hardware validation is blocked; continuing hardware-networking implementation
+**Updated:** 2026-08-01T21:51:00Z
 
 ## Milestones
 - [x] 1. Repo skeleton + CI — clean-clone Python and browser test commands passed
 - [x] 2. Protocol + framing — live HTTP crypto, QR-key comparison, shared fixtures, framing fuzz coverage, and cross-language crypto vectors are verified
 - [x] 3. Mock driver + HTTP portal — captive probes and DNS answer generation are verified in the simulator
 - [x] 4. App screens — guarded FSM, ten standalone review routes, QR scanner/manual fallback, progress UI, and error routes are typechecked and unit tested
-- [ ] 5. Simulator (`v0.1-sim`)
-- [ ] 6. Error screens (`v0.2-errors`)
+- [x] 5. Simulator (`v0.1-sim`) — fresh-clone launch and all mock error paths verified; tagged
+- [x] 6. Error screens (`v0.2-errors`) — standalone code routes and mock injection verified; tagged
 - [ ] 7. BLE (`v0.3-ble`)
 - [ ] 8. Hardware networking (`v0.4-hw`)
 
@@ -32,18 +32,20 @@
 - Built the app screen flow and error taxonomy; `npm test -- --run` (5 passed), `npm run typecheck`, and `npm run build` passed
 - Extended mock failure injection for all Wi-Fi outcomes and session/transport failures; simulator launch succeeded with `SPARK_SIM_FAIL=WIFI_AUTH_FAILED SPARK_SIM_CONCURRENT_AP_STA=0`
 - Fresh temporary clone launch succeeded: it created a new Python venv, installed dependencies, printed QR PNG/ASCII, and served the simulator. Browser BLE framing loopback tests now pass (8 browser tests total).
+- Verified all documented simulator Wi-Fi error codes directly and as `?screen=error&error=<CODE>` review routes; Python tests: 9 passed, browser tests: 8 passed, typecheck/build passed. Tagged and pushed `v0.1-sim` and `v0.2-errors` (`22158e6`).
+- Added the production NetworkManager D-Bus driver (`dbus-fast`), including startup ownership detection, access-point scan, WPA2 profile activation, and a 2.4 GHz shared SoftAP profile. Lint, 9 Python tests, 8 browser tests, and TypeScript typecheck passed (`8d001f5`).
 
 ## Blocked
 - Nothing blocks simulator work.
-- BLE validation requires the real Spark, a BlueZ-capable Linux Bluetooth adapter, and an Android phone. Hardware-networking validation requires the Spark and a supported Wi-Fi radio.
+- BLE validation requires the real Spark, a BlueZ-capable Linux Bluetooth adapter, and an Android phone. This workspace's `bluetoothctl show` fails with `Unable to open mgmt_socket`; no usable adapter is present.
+- Hardware-networking validation requires the Spark, NetworkManager, and a supported Wi-Fi radio. None is available in this workspace, so D-Bus activation, SoftAP, DNS, mDNS, and handoff behavior cannot yet be run.
 
 ## Decisions I made that the spec didn't cover
-- The simulator starts with HTTP on `localhost:8080`; production SoftAP and BLE remain deferred until their build-order steps.
-- Hardware validation will start at the BLE and NetworkManager milestones, after the simulator contract is complete.
+- The simulator starts with HTTP on `localhost:8080`; production SoftAP uses NetworkManager shared mode when hardware mode is selected.
+- The simulator accepts both documented uppercase `SPARK_SIM_FAIL` error codes and concise aliases. `WIFI_NO_INTERNET` proceeds to LAN-only success by design.
 
 ## Next
-- Verify the simulator UI from a genuinely fresh temporary clone in a browser, including the default flow and every `SPARK_SIM_FAIL` error route; only then tag `v0.1-sim` and `v0.2-errors`.
-- Implement BLE loopback framing and then validate against Android Chrome and the real Spark (Priority 6).
-- Implement NetworkManager D-Bus driver, AP mode, mDNS, and real captive portal behavior (Priority 7).
+- Implement the actual Web Bluetooth GATT transport (request-device gesture, advertised service filter, characteristics, gzip/base64url framing, reconnect) and BLE peripheral, then validate against Android Chrome and the real Spark (Priority 6). The radio-free framing loopback is already tested.
+- Complete and unit-test the NetworkManager driver: map NM connection states to all Wi-Fi errors, report real IPv4 details, make SoftAP credentials/channel lifecycle persistent, add mDNS, and connect captive-probe/DNS behavior to the AP address (Priority 7). Validate on a supported radio when available.
 - Implement runtime AP+STA handoff and recovery behavior (Priority 8).
 - Implement persistent first-boot/systemd provisioning lifecycle, physical reset, claim lock, and rate limits (Priority 9).
