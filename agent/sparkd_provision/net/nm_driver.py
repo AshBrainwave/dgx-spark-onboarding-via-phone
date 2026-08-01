@@ -149,6 +149,7 @@ class NetworkManagerDriver(NetDriver):
         self._ap_connection: str | None = None
         self._ap_profile: str | None = None
         self._ap_interface: str | None = None
+        self._ap_device_path: str | None = None
         self._concurrent_ap_sta = False
 
     @classmethod
@@ -325,10 +326,11 @@ class NetworkManagerDriver(NetDriver):
     async def forget(self) -> None:
         self._status = LinkStatus()
 
-    async def softap_up(self, ssid: str, psk: str) -> None:
+    async def softap_up(self, ssid: str, psk: str) -> str:
         ap_device = self.device_path
         if self.supports_concurrent_ap_sta:
             ap_device = await self._ensure_ap_device()
+        self._ap_device_path = ap_device
         wifi_settings = {
             "ssid": _ssid_variant(ssid),
             "mode": _variant("s", "ap"),
@@ -373,6 +375,17 @@ class NetworkManagerDriver(NetDriver):
                 "ooo",
                 [self._ap_profile, ap_device, "/"],
             )
+            for _ in range(150):
+                state = int(await self._property(ap_device, NM_DEVICE, "State"))
+                if state == 100:
+                    config = await self._property(ap_device, NM_DEVICE, "Ip4Config")
+                    address, _, _ = await self._ipv4_details(config)
+                    if address:
+                        return address
+                if state == 120:
+                    raise NetworkManagerError("provisioning AP activation failed")
+                await asyncio.sleep(0.1)
+            raise NetworkManagerError("provisioning AP did not acquire an IPv4 address")
         except NetworkManagerError:
             try:
                 await self.softap_down()
@@ -390,6 +403,7 @@ class NetworkManagerDriver(NetDriver):
         if self._ap_interface:
             await self._run_iw("dev", self._ap_interface, "del")
             self._ap_interface = None
+        self._ap_device_path = None
 
     async def _ensure_ap_device(self) -> str:
         self._ap_interface = f"{self.interface[:11]}-ap"

@@ -45,6 +45,6 @@ def answer_a_query(query: bytes, address: bytes) -> bytes | None:
 async def start_dns_responder(ap_address: str, port: int = 53) -> asyncio.DatagramTransport:
     loop = asyncio.get_running_loop()
     transport, _ = await loop.create_datagram_endpoint(
-        lambda: CaptiveDnsProtocol(ap_address), local_addr=("0.0.0.0", port)
+        lambda: CaptiveDnsProtocol(ap_address), local_addr=(ap_address, port)
     )
     return transport

@@ -26,6 +26,8 @@ python3 -m venv "${runtime_root}/venv"
 
 install -D -m 0644 "${repo_root}/deploy/sparkd-provision.service" \
   /etc/systemd/system/sparkd-provision.service
+install -D -m 0644 "${repo_root}/deploy/dgx-spark-captive-dns.conf" \
+  /etc/NetworkManager/dnsmasq-shared.d/dgx-spark-captive-dns.conf
 environment_file="$(mktemp)"
 trap 'rm -f "${environment_file}"' EXIT
 printf 'SPARK_WIFI_INTERFACE=%s\n' "${interface}" > "${environment_file}"

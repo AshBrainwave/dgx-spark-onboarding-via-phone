@@ -76,8 +76,9 @@ class MockDriver(NetDriver):
     async def forget(self) -> None:
         self._status = LinkStatus()
 
-    async def softap_up(self, ssid: str, psk: str) -> None:
+    async def softap_up(self, ssid: str, psk: str) -> str:
         self.ap_up_calls += 1
+        return "10.42.0.1"
 
     async def softap_down(self) -> None:
         self.ap_down_calls += 1

@@ -9,6 +9,7 @@ from sparkd_provision.config import DeviceIdentity
 from sparkd_provision.net.mdns import MdnsPublisher
 from sparkd_provision.net.mock_driver import MockDriver
 from sparkd_provision.net.nm_driver import NetworkManagerDriver
+from sparkd_provision.portal.dns import start_dns_responder
 from sparkd_provision.portal.server import create_app
 from sparkd_provision.reset_button import GpiodResetButton
 from sparkd_provision.state import StateStore
@@ -41,7 +42,7 @@ def main() -> None:
             # This check intentionally happens before touching the interface when
             # NetworkManager does not own it; do not fight netplan or another manager.
             driver = await NetworkManagerDriver.create(args.interface)
-            await driver.softap_up(state.state.ap_ssid, state.state.ap_psk)
+            ap_address = await driver.softap_up(state.state.ap_ssid, state.state.ap_psk)
             try:
                 mdns = await MdnsPublisher.create()
             except (OSError, RuntimeError):
@@ -50,6 +51,14 @@ def main() -> None:
                 mdns = None
         handlers = Handlers(driver, state, mdns, serial=identity.serial, model=identity.model)
         app = create_app(handlers)
+        if not args.mock:
+            dns_transport = await start_dns_responder(ap_address)
+            app["dns_transport"] = dns_transport
+
+            async def close_dns(_: web.Application) -> None:
+                dns_transport.close()
+
+            app.on_cleanup.append(close_dns)
         if args.reset_gpio_chip is not None:
             button = GpiodResetButton.create(
                 args.reset_gpio_chip, args.reset_gpio_line, handlers.factory_reset

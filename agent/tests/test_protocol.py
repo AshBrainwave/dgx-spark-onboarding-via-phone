@@ -218,6 +218,8 @@ def test_hardware_installer_uses_detected_interface_and_port_80() -> None:
     assert "wlan0" not in service
     assert "nmcli -t -f DEVICE,TYPE device status" in installer
     assert "agent[hardware]" in installer
+    assert "dgx-spark-captive-dns.conf" in installer
+    assert (root / "deploy/dgx-spark-captive-dns.conf").read_text().strip().endswith("port=0")
 
 
 def test_real_networkmanager_scan_shapes_are_normalized() -> None:
@@ -302,6 +304,7 @@ async def test_concurrent_softap_uses_a_separate_networkmanager_device() -> None
     driver = NetworkManagerDriver(None, "/device/sta", "wlP9s9")
     driver._concurrent_ap_sta = True
     device_lookups = 0
+    activated = False
     iw_calls: list[tuple[str, ...]] = []
     dbus_calls: list[tuple[str, list[object]]] = []
 
@@ -315,8 +318,14 @@ async def test_concurrent_softap_uses_a_separate_networkmanager_device() -> None
         iw_calls.append(arguments)
 
     async def device_property(path: str, interface: str, name: str) -> object:
+        if (path, interface, name) == (
+            "/device/ap",
+            "org.freedesktop.NetworkManager.Device",
+            "State",
+        ):
+            return 100 if activated else 30
         values = {
-            ("/device/ap", "org.freedesktop.NetworkManager.Device", "State"): 30,
+            ("/device/ap", "org.freedesktop.NetworkManager.Device", "Ip4Config"): "/ip4/ap",
             (
                 "/device/sta",
                 "org.freedesktop.NetworkManager.Device.Wireless",
@@ -337,6 +346,7 @@ async def test_concurrent_softap_uses_a_separate_networkmanager_device() -> None
         signature: str = "",
         body: list[object] | None = None,
     ) -> object:
+        nonlocal activated
         del path, interface, signature
         values = body or []
         dbus_calls.append((member, values))
@@ -349,6 +359,7 @@ async def test_concurrent_softap_uses_a_separate_networkmanager_device() -> None
             return "/profile/ap"
         if member == "ActivateConnection":
             assert values == ["/profile/ap", "/device/ap", "/"]
+            activated = True
             return "/active/ap"
         return None
 
@@ -357,7 +368,12 @@ async def test_concurrent_softap_uses_a_separate_networkmanager_device() -> None
     driver._run_iw = run_iw
     driver._call = call
 
-    await driver.softap_up("DGX-Spark-3847", "SafePass2345")
+    async def ipv4_details(_: str) -> tuple[str, str, str]:
+        return "10.42.0.1", "", ""
+
+    driver._ipv4_details = ipv4_details
+
+    assert await driver.softap_up("DGX-Spark-3847", "SafePass2345") == "10.42.0.1"
     await driver.softap_down()
 
     assert ("dev", "wlP9s9", "interface", "add", "wlP9s9-ap", "type", "__ap") in iw_calls
