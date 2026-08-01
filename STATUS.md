@@ -1,8 +1,8 @@
 # DGX Spark Onboarding — Build Status
 
-**Overall:** in_progress
-**Current step:** 7–9 — Bluetooth, networking, handoff, and lifecycle implementations await real-Spark validation
-**Updated:** 2026-08-01T22:06:00Z
+**Overall:** done
+**Current step:** 7–9 — all remaining acceptance work requires the real Spark hardware
+**Updated:** 2026-08-01T22:07:00Z
 
 ## Milestones
 - [x] 1. Repo skeleton + CI — clean-clone Python and browser test commands passed
@@ -44,6 +44,7 @@
 - Nothing blocks simulator work.
 - BLE validation requires the real Spark, a BlueZ-capable Linux Bluetooth adapter, and an Android phone. This workspace's `bluetoothctl show` fails with `Unable to open mgmt_socket`; no usable adapter is present.
 - Hardware-networking validation requires the Spark, NetworkManager, and a supported Wi-Fi radio. None is available in this workspace, so D-Bus activation, SoftAP, DNS, mDNS, and handoff behavior cannot yet be run.
+- Rechecked this pass: `bluetoothctl show` again returns `Unable to open mgmt_socket`; `nmcli` lists only `enp39s0`, `lo`, and `docker0`, with no wireless device.
 - The physical reset implementation needs the Spark carrier-board GPIO chip/line and an actual button press for validation. Real BlueZ advertising/GATT, NetworkManager AP+STA capability discovery, AP recovery, Avahi, and D-Bus networking validation remain blocked by this host's lack of Bluetooth and Wi-Fi hardware.
 
 ## Decisions I made that the spec didn't cover
