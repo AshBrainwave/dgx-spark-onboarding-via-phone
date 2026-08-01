@@ -1,0 +1,4 @@
+[
+  {"request":{"v":1,"id":"01HCONTRACT0000000000000000","op":"device.info","sid":null,"body":{}},"response":{"v":1,"id":"01HCONTRACT0000000000000000","ok":true,"body":{"serial":"SIM-0001"}}},
+  {"request":{"v":1,"id":"01HCONTRACT0000000000000001","op":"wifi.scan","sid":"session","body":{"force":false}}}
+]

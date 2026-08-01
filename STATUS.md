@@ -1,13 +1,13 @@
 # DGX Spark Onboarding — Build Status
 
 **Overall:** in_progress
-**Current step:** 1 — Repo skeleton + CI
+**Current step:** 3 — Mock driver + HTTP portal
 **Updated:** 2026-08-01T00:00:00Z
 
 ## Milestones
-- [ ] 1. Repo skeleton + CI
-- [ ] 2. Protocol + framing + crypto (contract tests green)
-- [ ] 3. Mock driver + HTTP portal
+- [x] 1. Repo skeleton + CI
+- [x] 2. Protocol + framing (contract foundation and tests green)
+- [ ] 3. Mock driver + HTTP portal ← in progress
 - [ ] 4. App screens
 - [ ] 5. Simulator (`v0.1-sim`)
 - [ ] 6. Error screens (`v0.2-errors`)
@@ -16,6 +16,7 @@
 
 ## Done since last update
 - Initial README check-in (`f3c54e8`)
+- Added skeleton, documentation, Apache-2.0 license, and CI (`fa6de1b`)
 
 ## Blocked
 - GitHub push is blocked: `git push -u origin main` received HTTP 403 for `AshBrainwave`. Local commits continue normally.
@@ -27,3 +28,4 @@
 ## Next
 - Add the repository skeleton, license, CI, and implementation documentation.
 - Implement the shared protocol contract and its Python/TypeScript representations.
+- Finish HTTP simulator endpoint and build the browser client against it.
