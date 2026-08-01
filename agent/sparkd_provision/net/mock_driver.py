@@ -9,7 +9,11 @@ from sparkd_provision.protocol.messages import Network
 
 class MockDriver(NetDriver):
     def __init__(self) -> None:
-        self.failure = os.getenv("SPARK_SIM_FAIL", "none").lower()
+        # Preserve the protocol spelling so `SPARK_SIM_FAIL=WIFI_AUTH_FAILED`
+        # works exactly as it is printed in the error taxonomy.  A few short
+        # aliases remain convenient for demo commands.
+        self.raw_failure = os.getenv("SPARK_SIM_FAIL", "none").strip()
+        self.failure = self.raw_failure.lower()
         self._status = LinkStatus()
         self._concurrent = os.getenv("SPARK_SIM_CONCURRENT_AP_STA", "1") == "1"
         self.networks = [
@@ -50,7 +54,14 @@ class MockDriver(NetDriver):
                 "wifi_band_mismatch": "WIFI_BAND_MISMATCH",
                 "wifi_enterprise_unsupported": "WIFI_ENTERPRISE_UNSUPPORTED",
                 "device_lost_after_handoff": "DEVICE_LOST_AFTER_HANDOFF",
-            }.get(self.failure)
+            }.get(self.failure, self.raw_failure.upper() if self.raw_failure else None)
+            if code not in {
+                "WIFI_AUTH_FAILED", "WIFI_SSID_NOT_FOUND", "WIFI_WEAK_SIGNAL",
+                "WIFI_DHCP_FAILED", "WIFI_NO_INTERNET", "WIFI_CAPTIVE_PORTAL",
+                "WIFI_ENTERPRISE_UNSUPPORTED", "WIFI_BAND_MISMATCH",
+                "DEVICE_LOST_AFTER_HANDOFF",
+            }:
+                code = None
             if code:
                 self._status = LinkStatus(phase="failed", ssid=ssid, err=code)
             else:

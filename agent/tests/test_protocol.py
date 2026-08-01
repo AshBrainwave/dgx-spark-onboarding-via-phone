@@ -1,11 +1,13 @@
 import json
 import random
 import struct
+import asyncio
 from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 
 from sparkd_provision.api.handlers import Handlers
+from sparkd_provision.net import mock_driver
 from sparkd_provision.net.mock_driver import MockDriver
 from sparkd_provision.portal.dns import answer_a_query
 from sparkd_provision.protocol.crypto import (
@@ -17,6 +19,29 @@ from sparkd_provision.protocol.crypto import (
     unb64url,
 )
 from sparkd_provision.protocol.framing import Reassembler, fragment
+
+
+async def test_mock_driver_accepts_every_documented_wifi_failure(monkeypatch) -> None:
+    real_sleep = asyncio.sleep
+
+    async def no_delay(_: float) -> None:
+        await real_sleep(0)
+
+    monkeypatch.setattr(mock_driver.asyncio, "sleep", no_delay)
+    codes = (
+        "WIFI_AUTH_FAILED", "WIFI_SSID_NOT_FOUND", "WIFI_WEAK_SIGNAL",
+        "WIFI_DHCP_FAILED", "WIFI_NO_INTERNET", "WIFI_CAPTIVE_PORTAL",
+        "WIFI_ENTERPRISE_UNSUPPORTED", "WIFI_BAND_MISMATCH",
+        "DEVICE_LOST_AFTER_HANDOFF",
+    )
+    for code in codes:
+        monkeypatch.setenv("SPARK_SIM_FAIL", code)
+        driver = MockDriver()
+        await driver.connect("Home", "password", "wpa2-psk")
+        for _ in range(6):
+            await real_sleep(0)
+        assert (await driver.status()).err == code
+    monkeypatch.delenv("SPARK_SIM_FAIL", raising=False)
 
 
 def test_framing_round_trip() -> None:

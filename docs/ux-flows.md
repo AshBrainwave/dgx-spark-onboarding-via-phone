@@ -17,3 +17,8 @@ development route.
 
 Errors return only to the relevant list, password, join, retry, or manual-IP action; they
 never silently restart QR scanning. `PUBKEY_MISMATCH` is the only hard abort.
+
+For review without hardware, use `?screen=error&error=<CODE>` for any listed protocol error,
+for example `?screen=error&error=WIFI_AUTH_FAILED`. `SPARK_SIM_FAIL` accepts the same
+uppercase code (and the documented short aliases) so each screen can also be reached through
+the actual simulator flow. `WIFI_NO_INTERNET` deliberately continues to LAN-only success.
