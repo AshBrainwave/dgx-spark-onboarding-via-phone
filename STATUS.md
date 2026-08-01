@@ -2,13 +2,13 @@
 
 **Overall:** in_progress
 **Current step:** Hardware bring-up — waiting for the Spark SSH target; Mac-side work continues
-**Updated:** 2026-08-01T22:48:06Z
+**Updated:** 2026-08-01T22:54:14Z
 
 ## Verification matrix
 
 | Verified on hardware | Verified in simulation only | Deferred (no Android) |
 | --- | --- | --- |
-| None in this workspace: no Spark host/SSH target, Wi-Fi radio, Bluetooth adapter, Avahi, or GPIO button is accessible. | Protocol crypto/framing, mock driver, portal probes/DNS, app FSM/screens/error routes, simulator, NetworkManager/SoftAP implementation, BlueZ bridge, mDNS publisher, handoff recovery, lifecycle/reset logic. | Chrome Web Bluetooth chooser, user-gesture handling, Location Services prompt, Chrome reconnect/service-cache behaviour, and Android SoftAP fallback/`.local` resolution. |
+| Mac CoreBluetooth permission/preflight: 19 BLE advertisers detected. The Spark itself is not yet advertising. | Protocol crypto/framing, mock driver, portal probes/DNS, app FSM/screens/error routes, simulator, NetworkManager/SoftAP implementation, BlueZ bridge, mDNS publisher, handoff recovery, lifecycle/reset logic, BLE central probe framing/codec self-test. | Chrome Web Bluetooth chooser, user-gesture handling, Location Services prompt, Chrome reconnect/service-cache behaviour, and Android SoftAP fallback/`.local` resolution. |
 
 ## Milestones
 - [x] 1. Repo skeleton + CI — clean-clone Python and browser test commands passed
@@ -21,6 +21,7 @@
 - [ ] 8. Hardware networking (`v0.4-hw`)
 
 ## Done since last update
+- Added the reusable macOS `bleak` central probe for advertising, GATT properties, real-MTU framing, timeout NAKs, encrypted provisioning, and truncated ciphertext. Its framing/codec self-test passes; CoreBluetooth detected 19 nearby BLE devices, proving macOS permission is active. Full Spark-side C1–C5 remains unrun until deployment.
 - Replaced the 35-line condensed `docs/SPEC.md` with the byte-identical 631-line authoritative build specification (`892edd4`).
 - Initial README check-in (`f3c54e8`)
 - Added skeleton, documentation, Apache-2.0 license, and CI (`fa6de1b`)
@@ -51,9 +52,8 @@
 - Nothing blocks simulator work.
 - GitHub push is blocked: `git push origin main` failed with `remote: Permission to AshBrainwave/dgx-spark-onboarding-via-phone.git denied to mash-falcon` and HTTP 403. Local commits continue as required.
 - Spark deployment and hardware Parts A/D are waiting for the operator to provide a key-authenticated `user@hostname` or `user@IP` SSH target.
-- BLE validation requires the real Spark, a BlueZ-capable Linux Bluetooth adapter, and an Android phone. This workspace's `bluetoothctl show` fails with `Unable to open mgmt_socket`; no usable adapter is present.
-- Hardware-networking validation requires the Spark, NetworkManager, and a supported Wi-Fi radio. None is available in this workspace, so D-Bus activation, SoftAP, DNS, mDNS, and handoff behavior cannot yet be run.
-- Rechecked this pass: `bluetoothctl show` again returns `Unable to open mgmt_socket`; `nmcli` lists only `enp39s0`, `lo`, and `docker0`, with no wireless device.
+- Spark-side BLE advertising/GATT validation requires the agent to be deployed and advertising. The Mac side is ready and its CoreBluetooth permission is verified; no Android device is needed for Part C.
+- Hardware-networking validation requires the Spark SSH target, NetworkManager, and its Wi-Fi radio. D-Bus activation, SoftAP, DNS, mDNS, and handoff behavior remain unrun.
 - The physical reset implementation needs the Spark carrier-board GPIO chip/line and an actual button press for validation. Real BlueZ advertising/GATT, NetworkManager AP+STA capability discovery, AP recovery, Avahi, and D-Bus networking validation remain blocked by this host's lack of Bluetooth and Wi-Fi hardware.
 - Hardware bring-up cannot start from this workspace because no Spark hostname/IP or remote shell connection has been configured. The Mac/iPhone/Spark operator steps in the hardware brief require execution at those devices.
 

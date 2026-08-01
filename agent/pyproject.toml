@@ -6,6 +6,7 @@ dependencies = ["aiohttp>=3.10", "cryptography>=43", "dbus-fast>=2.21", "qrcode[
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "pytest-asyncio>=0.24", "ruff>=0.8"]
+probe = ["bleak>=3,<4"]
 # GPIO wiring is board-specific, so keep its native binding out of simulator and
 # browser-developer installs.  Hardware images enable this extra.
 hardware = ["gpiod>=2.2"]
