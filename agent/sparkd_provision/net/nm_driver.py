@@ -45,6 +45,18 @@ def _band(frequency: int) -> str:
     return "2.4ghz"
 
 
+def _channel(frequency: int) -> int | None:
+    if frequency == 2484:
+        return 14
+    if 2412 <= frequency <= 2472:
+        return (frequency - 2407) // 5
+    if 5000 <= frequency < 5925:
+        return (frequency - 5000) // 5
+    if 5955 <= frequency <= 7115:
+        return (frequency - 5950) // 5
+    return None
+
+
 def _quality_to_rssi(strength: int) -> int:
     quality = max(0, min(100, strength))
     return round(quality / 2 - 100)
@@ -317,17 +329,26 @@ class NetworkManagerDriver(NetDriver):
         ap_device = self.device_path
         if self.supports_concurrent_ap_sta:
             ap_device = await self._ensure_ap_device()
+        wifi_settings = {
+            "ssid": _ssid_variant(ssid),
+            "mode": _variant("s", "ap"),
+            "band": _variant("s", "bg"),
+        }
+        if self.supports_concurrent_ap_sta:
+            active_ap = await self._property(self.device_path, NM_WIRELESS, "ActiveAccessPoint")
+            if active_ap != "/":
+                frequency = int(await self._property(active_ap, NM_AP, "Frequency"))
+                channel = _channel(frequency)
+                if channel is not None:
+                    wifi_settings["band"] = _variant("s", "bg" if frequency < 5000 else "a")
+                    wifi_settings["channel"] = _variant("u", channel)
         settings = {
             "connection": {
                 "id": _variant("s", "DGX Spark provisioning AP"),
                 "type": _variant("s", "802-11-wireless"),
                 "autoconnect": _variant("b", False),
             },
-            "802-11-wireless": {
-                "ssid": _ssid_variant(ssid),
-                "mode": _variant("s", "ap"),
-                "band": _variant("s", "bg"),
-            },
+            "802-11-wireless": wifi_settings,
             "802-11-wireless-security": {
                 "key-mgmt": _variant("s", "wpa-psk"),
                 "psk": _variant("s", psk),

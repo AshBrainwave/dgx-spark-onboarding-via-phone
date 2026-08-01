@@ -2,7 +2,7 @@
 
 **Overall:** in_progress
 **Current step:** Part A2 — retest SoftAP on a separate virtual AP interface
-**Updated:** 2026-08-01T23:38:53Z
+**Updated:** 2026-08-01T23:41:28Z
 
 ## Verification matrix
 
@@ -21,6 +21,7 @@
 - [ ] 8. Hardware networking (`v0.4-hw`)
 
 ## Done since last update
+- Fourth guarded A2 activation preserved STA/SSH and reached hostap configuration, but NetworkManager selected channel 6 while the STA was on channel 3; this wiphy permits only one concurrent channel, so activation timed out with `supplicant-timeout`. Fixed concurrent AP settings to derive and pin the exact active-STA channel (including tested 2.4/5/6 GHz mappings). Cleanup removed the test interface/profile; the STA remained online.
 - Third guarded A2 activation kept the STA/SSH intact but raced NetworkManager initialization: the new AP device path appeared while state was still strictly unmanaged, so activation was rejected. A controlled interface-only probe showed it transitions to normal `disconnected`; fixed readiness to wait for NetworkManager device state >= 30 before activation. Cleanup removed the temporary interface and unsaved profile.
 - Second guarded A2 activation proved the original concurrency implementation wrong: NetworkManager activated the AP on `wlP9s9`, replaced `Droid_IoT`, and dropped SSH. The one-shot 45-second recovery timer restored the exact STA UUID and reachability without polling. Fixed concurrent mode to create a separate bounded-name `__ap` interface, wait for NetworkManager ownership, activate an unsaved shared-mode AP profile on that device, and remove the profile/interface on teardown; all 18 Mac tests pass.
 - First A2 activation failed safely before changing the radio: `dbus-fast` 5 rejected a Python `list[int]` for D-Bus signature `ay` (`SignatureBodyMismatchError`, requires `bytes`). Fixed both STA and SoftAP SSID construction behind a tested helper; the recovery timer was cancelled and `Droid_IoT` remained active.

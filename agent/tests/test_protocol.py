@@ -15,6 +15,7 @@ from sparkd_provision.net.capabilities import supports_concurrent_ap_sta
 from sparkd_provision.net.mock_driver import MockDriver
 from sparkd_provision.net.nm_driver import (
     NetworkManagerDriver,
+    _channel,
     _deduplicate_networks,
     _network_from_properties,
     _ssid_variant,
@@ -313,9 +314,21 @@ async def test_concurrent_softap_uses_a_separate_networkmanager_device() -> None
     async def run_iw(*arguments: str) -> None:
         iw_calls.append(arguments)
 
-    async def device_property(path: str, interface: str, name: str) -> int:
-        assert (path, interface, name) == ("/device/ap", "org.freedesktop.NetworkManager.Device", "State")
-        return 30
+    async def device_property(path: str, interface: str, name: str) -> object:
+        values = {
+            ("/device/ap", "org.freedesktop.NetworkManager.Device", "State"): 30,
+            (
+                "/device/sta",
+                "org.freedesktop.NetworkManager.Device.Wireless",
+                "ActiveAccessPoint",
+            ): "/access-point/current",
+            (
+                "/access-point/current",
+                "org.freedesktop.NetworkManager.AccessPoint",
+                "Frequency",
+            ): 2422,
+        }
+        return values[(path, interface, name)]
 
     async def call(
         path: str,
@@ -331,6 +344,8 @@ async def test_concurrent_softap_uses_a_separate_networkmanager_device() -> None
             settings = values[0]
             assert settings["connection"]["interface-name"].value == "wlP9s9-ap"
             assert settings["802-11-wireless"]["ssid"].value == b"DGX-Spark-3847"
+            assert settings["802-11-wireless"]["band"].value == "bg"
+            assert settings["802-11-wireless"]["channel"].value == 3
             return "/profile/ap"
         if member == "ActivateConnection":
             assert values == ["/profile/ap", "/device/ap", "/"]
@@ -352,6 +367,13 @@ async def test_concurrent_softap_uses_a_separate_networkmanager_device() -> None
         "ActivateConnection",
         "DeactivateConnection",
         "Delete",
+    ]
+    assert [_channel(frequency) for frequency in (2412, 2422, 2484, 5180, 6295)] == [
+        1,
+        3,
+        14,
+        36,
+        69,
     ]
 
 
