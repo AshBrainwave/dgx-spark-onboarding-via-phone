@@ -31,6 +31,7 @@
 - Verified a clean clone with `uv sync --extra dev`, Python tests (8 passed), `npm ci`, browser tests (2 passed), and TypeScript typecheck (pending commit)
 - Built the app screen flow and error taxonomy; `npm test -- --run` (5 passed), `npm run typecheck`, and `npm run build` passed
 - Extended mock failure injection for all Wi-Fi outcomes and session/transport failures; simulator launch succeeded with `SPARK_SIM_FAIL=WIFI_AUTH_FAILED SPARK_SIM_CONCURRENT_AP_STA=0`
+- Fresh temporary clone launch succeeded: it created a new Python venv, installed dependencies, printed QR PNG/ASCII, and served the simulator. Browser BLE framing loopback tests now pass (8 browser tests total).
 
 ## Blocked
 - Nothing blocks simulator work.
@@ -41,7 +42,7 @@
 - Hardware validation will start at the BLE and NetworkManager milestones, after the simulator contract is complete.
 
 ## Next
-- Verify the simulator from a genuinely fresh temporary clone in a browser, including the default flow and every `SPARK_SIM_FAIL` error route; only then tag `v0.1-sim` and `v0.2-errors`.
+- Verify the simulator UI from a genuinely fresh temporary clone in a browser, including the default flow and every `SPARK_SIM_FAIL` error route; only then tag `v0.1-sim` and `v0.2-errors`.
 - Implement BLE loopback framing and then validate against Android Chrome and the real Spark (Priority 6).
 - Implement NetworkManager D-Bus driver, AP mode, mDNS, and real captive portal behavior (Priority 7).
 - Implement runtime AP+STA handoff and recovery behavior (Priority 8).

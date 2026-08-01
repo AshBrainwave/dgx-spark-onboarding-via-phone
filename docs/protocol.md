@@ -20,3 +20,6 @@ compressed, base64url JSON envelope. Reassembly has a ten-second deadline and dr
 incomplete messages. CTRL_RX is write-without-response, CTRL_TX is notify, and INFO is a
 read-only unencrypted device-info snapshot. The base UUID must be in the advertisement
 service-UUID list; it is not sufficient to expose it after connect.
+
+The browser suite includes a radio-free `LoopbackTransport` that fragments and reassembles
+real request envelopes. It is the required first framing validation before Android hardware.

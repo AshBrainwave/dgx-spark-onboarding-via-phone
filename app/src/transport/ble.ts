@@ -1,2 +1,2 @@
-import type { Transport } from "./types";
-export class BleTransport implements Transport { async request(): Promise<never> { throw new Error("BLE is scheduled for v0.3-ble"); } }
+import { BLE_PAYLOAD_SIZE } from "../protocol/framing";
+export { BLE_PAYLOAD_SIZE };
