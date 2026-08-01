@@ -3,7 +3,8 @@ set -euo pipefail
 
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root_dir"
-echo "Enrollment QR payload (simulated): DGXSPARK:SIM-0001:simulated-pubkey"
+./scripts/flash-qr.sh
+echo "Enrollment QR payload uses pairing code: 12345678"
 (cd agent && uv run python -m sparkd_provision --mock --port 8080) &
 agent_pid=$!
 trap 'kill "$agent_pid"' EXIT INT TERM

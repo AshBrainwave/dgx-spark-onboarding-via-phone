@@ -18,6 +18,7 @@
 - Initial README check-in (`f3c54e8`)
 - Added skeleton, documentation, Apache-2.0 license, and CI (`fa6de1b`)
 - Added transport-agnostic mock HTTP agent and framing test coverage (`b9df34a`)
+- Added simulator enrollment QR PNG and terminal rendering (pending commit)
 
 ## Blocked
 - GitHub push is blocked: `git push -u origin main` received HTTP 403 for `AshBrainwave`. Local commits continue normally.
@@ -27,6 +28,5 @@
 - The simulator starts with HTTP on `localhost:8080`; production SoftAP and BLE remain deferred until their build-order steps.
 
 ## Next
-- Add the repository skeleton, license, CI, and implementation documentation.
 - Complete standalone routes and all distinct error screens.
-- Add QR PNG/terminal rendering and exercise the simulator command end to end.
+- Add crypto vectors and shared TS/Python message contract tests.
