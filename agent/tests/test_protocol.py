@@ -1,4 +1,6 @@
 import json
+import random
+from pathlib import Path
 
 from sparkd_provision.api.handlers import Handlers
 from sparkd_provision.net.mock_driver import MockDriver
@@ -44,3 +46,32 @@ async def test_handler_decrypts_ciphertext_without_password_on_wire() -> None:
     assert password not in json.dumps(request)
     accepted = await handlers.handle(request)
     assert accepted["ok"] is True
+
+
+def test_framing_fuzzes_sizes_order_and_drops() -> None:
+    randomizer = random.Random(20260801)
+    for _ in range(100):
+        payload = randomizer.randbytes(randomizer.randrange(0, 1024))
+        frames = fragment(payload, randomizer.randrange(1, 65535))
+        shuffled = frames[:]
+        randomizer.shuffle(shuffled)
+        reassembler = Reassembler()
+        completed = None
+        for frame in shuffled:
+            completed = reassembler.add(frame) or completed
+        assert completed is not None
+        assert completed[1] == payload
+        if len(frames) > 1:
+            reassembler = Reassembler()
+            for frame in frames[:-1]:
+                assert reassembler.add(frame) is None
+
+
+def test_shared_contract_fixtures_have_valid_envelopes() -> None:
+    fixture_path = Path(__file__).parents[2] / "protocol" / "messages.json"
+    for fixture in json.loads(fixture_path.read_text()):
+        request = fixture["request"]
+        assert request["v"] == 1
+        assert isinstance(request["id"], str)
+        assert isinstance(request["op"], str)
+        assert isinstance(request["body"], dict)
