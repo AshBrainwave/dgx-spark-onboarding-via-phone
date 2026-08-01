@@ -2,10 +2,10 @@
 
 **Overall:** in_progress
 **Current step:** 2 — Protocol security integration
-**Updated:** 2026-08-01T07:45:00Z
+**Updated:** 2026-08-01T07:55:00Z
 
 ## Milestones
-- [ ] 1. Repo skeleton + CI — CI has not been validated from a clean environment
+- [x] 1. Repo skeleton + CI — clean-clone Python and browser test commands passed
 - [x] 2. Protocol + framing — live HTTP crypto, QR-key comparison, shared fixtures, framing fuzz coverage, and cross-language crypto vectors are verified
 - [x] 3. Mock driver + HTTP portal — captive probes and DNS answer generation are verified in the simulator
 - [ ] 4. App screens — basic flow exists, but required screen components, QR scanning, and FSM are missing
@@ -27,7 +27,8 @@
 - Added verified captive-probe redirect handling and distinct malformed/unknown-operation errors (`5e94158`)
 - Reproduced and fixed invalid AES-GCM tag handling; `agent/.venv/bin/python -m pytest`: 6 passed (`3d279cd`)
 - Added shared fixed X25519/HKDF/AES-GCM vectors; Python: 7 passed, TypeScript: 2 passed (`c487660`)
-- Added captive SoftAP DNS A-query response coverage; `agent/.venv/bin/python -m pytest`: 8 passed (pending commit)
+- Added captive SoftAP DNS A-query response coverage; `agent/.venv/bin/python -m pytest`: 8 passed (`ee4f28b`)
+- Verified a clean clone with `uv sync --extra dev`, Python tests (8 passed), `npm ci`, browser tests (2 passed), and TypeScript typecheck (pending commit)
 
 ## Blocked
 - Nothing blocks simulator work.
@@ -38,5 +39,4 @@
 - Hardware validation will start at the BLE and NetworkManager milestones, after the simulator contract is complete.
 
 ## Next
-- Validate CI from a fresh clone without pre-existing dependencies.
 - Split the browser flow into the required screens and implement its finite-state machine.
