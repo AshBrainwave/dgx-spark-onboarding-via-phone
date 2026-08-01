@@ -2,11 +2,11 @@
 
 **Overall:** in_progress
 **Current step:** 2 — Protocol security integration
-**Updated:** 2026-08-01T07:25:00Z
+**Updated:** 2026-08-01T07:35:00Z
 
 ## Milestones
 - [ ] 1. Repo skeleton + CI — CI has not been validated from a clean environment
-- [ ] 2. Protocol + framing — live HTTP crypto, QR-key comparison, shared envelope fixtures, and Python framing fuzz coverage are verified; cross-language crypto vectors are still missing ← in progress
+- [x] 2. Protocol + framing — live HTTP crypto, QR-key comparison, shared fixtures, framing fuzz coverage, and cross-language crypto vectors are verified
 - [ ] 3. Mock driver + HTTP portal — captive probe redirects and post-provision responses are verified; the AP DNS responder is still missing
 - [ ] 4. App screens — basic flow exists, but required screen components, QR scanning, and FSM are missing
 - [ ] 5. Simulator (`v0.1-sim`)
@@ -25,7 +25,8 @@
 - Wired the live HTTP session to X25519/HKDF/AES-GCM and verified password-free request serialization (`7da6cc6`)
 - Ran `agent/.venv/bin/python -m pytest`: 5 passed; ran browser contract test: 1 passed (`fa71e07`)
 - Added verified captive-probe redirect handling and distinct malformed/unknown-operation errors (`5e94158`)
-- Reproduced and fixed invalid AES-GCM tag handling; `agent/.venv/bin/python -m pytest`: 6 passed (pending commit)
+- Reproduced and fixed invalid AES-GCM tag handling; `agent/.venv/bin/python -m pytest`: 6 passed (`3d279cd`)
+- Added shared fixed X25519/HKDF/AES-GCM vectors; Python: 7 passed, TypeScript: 2 passed (pending commit)
 
 ## Blocked
 - Nothing blocks simulator work.
@@ -36,5 +37,5 @@
 - Hardware validation will start at the BLE and NetworkManager milestones, after the simulator contract is complete.
 
 ## Next
-- Add shared TypeScript/Python crypto vectors.
+- Implement the SoftAP DNS responder and validate CI from a fresh clone.
 - Split the browser flow into the required screens and implement its finite-state machine.

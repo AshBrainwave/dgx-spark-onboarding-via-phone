@@ -1,0 +1,15 @@
+[
+  {
+    "client_private": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA",
+    "client_private_pkcs8": "MC4CAQAwBQYDK2VuBCIEIAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8g",
+    "device_private": "ISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0-P0A",
+    "client_public": "B6N8vBQgk8i3VdwbEOhstCY3StFqqFPtC9_AsrhtHHw",
+    "device_public": "WGmv9FBUlzLLqu1eXfmzCm2jHLDldCutWtShp2jxpns",
+    "client_nonce": "AAECAwQFBgcICQoLDA0ODw",
+    "device_nonce": "EBESExQVFhcYGRobHB0eHw",
+    "ssid": "DGX-Test-5G",
+    "psk": "correct-horse-battery-staple",
+    "counter": 7,
+    "ciphertext": "AAAAAAAAAAAAAAAHSojWJEhD2xXPg68neisc3lvXiem-P9JlVPdwboW_4iAsTatl22RpxLHuDf0"
+  }
+]

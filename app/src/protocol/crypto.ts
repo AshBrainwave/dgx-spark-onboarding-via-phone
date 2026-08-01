@@ -4,6 +4,7 @@ export const b64url = (value: Uint8Array) => btoa(String.fromCharCode(...value))
 export const unb64url = (value: string) => Uint8Array.from(atob(value.replaceAll("-", "+").replaceAll("_", "/") + "=".repeat((4 - value.length % 4) % 4)), char => char.charCodeAt(0));
 
 export async function createKeyPair() { return crypto.subtle.generateKey({ name: "X25519" }, true, ["deriveBits"]) as Promise<CryptoKeyPair>; }
+export async function importPrivateKey(encoded: string) { return crypto.subtle.importKey("pkcs8", unb64url(encoded), { name: "X25519" }, false, ["deriveBits"]); }
 export async function exportPublicKey(key: CryptoKey) { return b64url(new Uint8Array(await crypto.subtle.exportKey("raw", key))); }
 export async function deriveSessionKey(privateKey: CryptoKey, peer: string, clientNonce: string, deviceNonce: string) {
   const publicKey = await crypto.subtle.importKey("raw", unb64url(peer), { name: "X25519" }, false, []);

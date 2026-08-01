@@ -2,6 +2,8 @@ import json
 import random
 from pathlib import Path
 
+from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
+
 from sparkd_provision.api.handlers import Handlers
 from sparkd_provision.net.mock_driver import MockDriver
 from sparkd_provision.protocol.crypto import (
@@ -10,6 +12,7 @@ from sparkd_provision.protocol.crypto import (
     derive_key,
     encrypt_psk,
     generate_keypair,
+    unb64url,
 )
 from sparkd_provision.protocol.framing import Reassembler, fragment
 
@@ -100,3 +103,11 @@ def test_shared_contract_fixtures_have_valid_envelopes() -> None:
         assert isinstance(request["id"], str)
         assert isinstance(request["op"], str)
         assert isinstance(request["body"], dict)
+
+
+def test_shared_crypto_vectors_match_protocol_ciphertext() -> None:
+    vector_path = Path(__file__).parents[2] / "protocol" / "crypto-vectors.json"
+    for vector in json.loads(vector_path.read_text()):
+        private = X25519PrivateKey.from_private_bytes(unb64url(vector["client_private"]))
+        key = derive_key(private, vector["device_public"], vector["client_nonce"], vector["device_nonce"])
+        assert encrypt_psk(key, vector["counter"], vector["ssid"], vector["psk"]) == vector["ciphertext"]
