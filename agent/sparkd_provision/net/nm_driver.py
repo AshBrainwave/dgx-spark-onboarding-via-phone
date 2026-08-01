@@ -24,6 +24,7 @@ NM_IFACE = "org.freedesktop.NetworkManager"
 NM_DEVICE = "org.freedesktop.NetworkManager.Device"
 NM_WIRELESS = "org.freedesktop.NetworkManager.Device.Wireless"
 NM_SETTINGS = "org.freedesktop.NetworkManager.Settings"
+NM_SETTINGS_CONNECTION = "org.freedesktop.NetworkManager.Settings.Connection"
 NM_AP = "org.freedesktop.NetworkManager.AccessPoint"
 PROPERTIES = "org.freedesktop.DBus.Properties"
 WIFI_DEVICE_TYPE = 2
@@ -134,6 +135,8 @@ class NetworkManagerDriver(NetDriver):
         self.interface = interface
         self._status = LinkStatus()
         self._ap_connection: str | None = None
+        self._ap_profile: str | None = None
+        self._ap_interface: str | None = None
         self._concurrent_ap_sta = False
 
     @classmethod
@@ -311,10 +314,14 @@ class NetworkManagerDriver(NetDriver):
         self._status = LinkStatus()
 
     async def softap_up(self, ssid: str, psk: str) -> None:
+        ap_device = self.device_path
+        if self.supports_concurrent_ap_sta:
+            ap_device = await self._ensure_ap_device()
         settings = {
             "connection": {
                 "id": _variant("s", "DGX Spark provisioning AP"),
                 "type": _variant("s", "802-11-wireless"),
+                "autoconnect": _variant("b", False),
             },
             "802-11-wireless": {
                 "ssid": _ssid_variant(ssid),
@@ -328,17 +335,80 @@ class NetworkManagerDriver(NetDriver):
             "ipv4": {"method": _variant("s", "shared")},
             "ipv6": {"method": _variant("s", "ignore")},
         }
-        connection = await self._call(
-            NM_PATH + "/Settings", NM_SETTINGS, "AddConnection", "a{sa{sv}}", [settings]
-        )
-        self._ap_connection = await self._call(
-            NM_PATH, NM_IFACE, "ActivateConnection", "ooo", [connection, self.device_path, "/"]
-        )
+        if self._ap_interface:
+            settings["connection"]["interface-name"] = _variant("s", self._ap_interface)
+        try:
+            self._ap_profile = await self._call(
+                NM_PATH + "/Settings",
+                NM_SETTINGS,
+                "AddConnectionUnsaved",
+                "a{sa{sv}}",
+                [settings],
+            )
+            self._ap_connection = await self._call(
+                NM_PATH,
+                NM_IFACE,
+                "ActivateConnection",
+                "ooo",
+                [self._ap_profile, ap_device, "/"],
+            )
+        except NetworkManagerError:
+            try:
+                await self.softap_down()
+            except NetworkManagerError:
+                pass
+            raise
 
     async def softap_down(self) -> None:
         if self._ap_connection:
             await self._call(NM_PATH, NM_IFACE, "DeactivateConnection", "o", [self._ap_connection])
             self._ap_connection = None
+        if self._ap_profile:
+            await self._call(self._ap_profile, NM_SETTINGS_CONNECTION, "Delete")
+            self._ap_profile = None
+        if self._ap_interface:
+            await self._run_iw("dev", self._ap_interface, "del")
+            self._ap_interface = None
+
+    async def _ensure_ap_device(self) -> str:
+        self._ap_interface = f"{self.interface[:11]}-ap"
+        device = await self._device_path(self._ap_interface)
+        if device:
+            return device
+        await self._run_iw(
+            "dev", self.interface, "interface", "add", self._ap_interface, "type", "__ap"
+        )
+        for _ in range(50):
+            device = await self._device_path(self._ap_interface)
+            if device:
+                return device
+            await asyncio.sleep(0.1)
+        raise NetworkManagerError(
+            f"NetworkManager did not claim concurrent AP interface {self._ap_interface}"
+        )
+
+    async def _device_path(self, interface: str) -> str | None:
+        devices = await self._call(NM_PATH, NM_IFACE, "GetAllDevices")
+        for path in devices:
+            if await self._property(path, NM_DEVICE, "Interface") == interface:
+                return path
+        return None
+
+    @staticmethod
+    async def _run_iw(*arguments: str) -> None:
+        try:
+            process = await asyncio.create_subprocess_exec(
+                "iw",
+                *arguments,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+        except OSError as exc:
+            raise NetworkManagerError(f"could not execute iw: {exc}") from exc
+        output, error_output = await process.communicate()
+        if process.returncode:
+            detail = (error_output or output).decode(errors="replace").strip()
+            raise NetworkManagerError(f"iw {' '.join(arguments)} failed: {detail}")
 
     @property
     def supports_concurrent_ap_sta(self) -> bool:

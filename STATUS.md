@@ -1,8 +1,8 @@
 # DGX Spark Onboarding — Build Status
 
 **Overall:** in_progress
-**Current step:** Part A2 — retest SoftAP after real D-Bus byte-array fix
-**Updated:** 2026-08-01T23:31:19Z
+**Current step:** Part A2 — retest SoftAP on a separate virtual AP interface
+**Updated:** 2026-08-01T23:36:25Z
 
 ## Verification matrix
 
@@ -21,6 +21,7 @@
 - [ ] 8. Hardware networking (`v0.4-hw`)
 
 ## Done since last update
+- Second guarded A2 activation proved the original concurrency implementation wrong: NetworkManager activated the AP on `wlP9s9`, replaced `Droid_IoT`, and dropped SSH. The one-shot 45-second recovery timer restored the exact STA UUID and reachability without polling. Fixed concurrent mode to create a separate bounded-name `__ap` interface, wait for NetworkManager ownership, activate an unsaved shared-mode AP profile on that device, and remove the profile/interface on teardown; all 18 Mac tests pass.
 - First A2 activation failed safely before changing the radio: `dbus-fast` 5 rejected a Python `list[int]` for D-Bus signature `ay` (`SignatureBodyMismatchError`, requires `bytes`). Fixed both STA and SoftAP SSID construction behind a tested helper; the recovery timer was cancelled and `Droid_IoT` remained active.
 - Root hardware identity discovery exposed the real platform serial `1983825003847`; hardware naming therefore uses suffix `3847` (`DGX-Spark-3847`), while unprivileged discovery correctly falls back to hostname.
 - Fixed simulator identity leaking into hardware before A2: hardware mode now derives identity from `SPARK_SERIAL`, platform serial files, or hostname; `spark-0268` therefore drives AP name `DGX-Spark-0268`, BLE suffix `0268`, and mDNS name `dgx-spark-0268.local`, including after reset. Mac lint and all 17 tests pass.

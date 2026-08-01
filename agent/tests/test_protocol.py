@@ -14,6 +14,7 @@ from sparkd_provision.net import mock_driver
 from sparkd_provision.net.capabilities import supports_concurrent_ap_sta
 from sparkd_provision.net.mock_driver import MockDriver
 from sparkd_provision.net.nm_driver import (
+    NetworkManagerDriver,
     _deduplicate_networks,
     _network_from_properties,
     _ssid_variant,
@@ -294,6 +295,59 @@ def test_hardware_identity_drives_radio_and_handoff_names(tmp_path) -> None:
     assert handlers.hostname == "dgx-spark-0268"
     state.reset()
     assert state.state.ap_ssid == "DGX-Spark-0268"
+
+
+async def test_concurrent_softap_uses_a_separate_networkmanager_device() -> None:
+    driver = NetworkManagerDriver(None, "/device/sta", "wlP9s9")
+    driver._concurrent_ap_sta = True
+    device_lookups = 0
+    iw_calls: list[tuple[str, ...]] = []
+    dbus_calls: list[tuple[str, list[object]]] = []
+
+    async def device_path(interface: str) -> str | None:
+        nonlocal device_lookups
+        assert interface == "wlP9s9-ap"
+        device_lookups += 1
+        return "/device/ap" if device_lookups > 1 else None
+
+    async def run_iw(*arguments: str) -> None:
+        iw_calls.append(arguments)
+
+    async def call(
+        path: str,
+        interface: str,
+        member: str,
+        signature: str = "",
+        body: list[object] | None = None,
+    ) -> object:
+        del path, interface, signature
+        values = body or []
+        dbus_calls.append((member, values))
+        if member == "AddConnectionUnsaved":
+            settings = values[0]
+            assert settings["connection"]["interface-name"].value == "wlP9s9-ap"
+            assert settings["802-11-wireless"]["ssid"].value == b"DGX-Spark-3847"
+            return "/profile/ap"
+        if member == "ActivateConnection":
+            assert values == ["/profile/ap", "/device/ap", "/"]
+            return "/active/ap"
+        return None
+
+    driver._device_path = device_path
+    driver._run_iw = run_iw
+    driver._call = call
+
+    await driver.softap_up("DGX-Spark-3847", "SafePass2345")
+    await driver.softap_down()
+
+    assert ("dev", "wlP9s9", "interface", "add", "wlP9s9-ap", "type", "__ap") in iw_calls
+    assert ("dev", "wlP9s9-ap", "del") in iw_calls
+    assert [member for member, _ in dbus_calls] == [
+        "AddConnectionUnsaved",
+        "ActivateConnection",
+        "DeactivateConnection",
+        "Delete",
+    ]
 
 
 def test_captive_dns_answers_any_a_query_with_ap_address() -> None:
