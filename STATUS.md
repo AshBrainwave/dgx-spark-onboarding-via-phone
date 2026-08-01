@@ -2,12 +2,12 @@
 
 **Overall:** in_progress
 **Current step:** 2 — Protocol security integration
-**Updated:** 2026-08-01T07:02:00Z
+**Updated:** 2026-08-01T07:15:00Z
 
 ## Milestones
 - [ ] 1. Repo skeleton + CI — CI has not been validated from a clean environment
 - [ ] 2. Protocol + framing — live HTTP crypto, QR-key comparison, shared envelope fixtures, and Python framing fuzz coverage are verified; cross-language crypto vectors are still missing ← in progress
-- [ ] 3. Mock driver + HTTP portal — basic HTTP API exists; captive probes and DNS are missing
+- [ ] 3. Mock driver + HTTP portal — captive probe redirects and post-provision responses are verified; the AP DNS responder is still missing
 - [ ] 4. App screens — basic flow exists, but required screen components, QR scanning, and FSM are missing
 - [ ] 5. Simulator (`v0.1-sim`)
 - [ ] 6. Error screens (`v0.2-errors`)
@@ -23,7 +23,8 @@
 - Added unintegrated X25519/HKDF/AES-GCM protocol primitives (`5ea944f`)
 - Configured verified GitHub SSH access and pushed `main` (`5ea944f`)
 - Wired the live HTTP session to X25519/HKDF/AES-GCM and verified password-free request serialization (`7da6cc6`)
-- Ran `agent/.venv/bin/python -m pytest`: 5 passed; ran browser contract test: 1 passed (pending commit)
+- Ran `agent/.venv/bin/python -m pytest`: 5 passed; ran browser contract test: 1 passed (`fa71e07`)
+- Added verified captive-probe redirect handling and distinct malformed/unknown-operation errors (pending commit)
 
 ## Blocked
 - Nothing blocks simulator work.

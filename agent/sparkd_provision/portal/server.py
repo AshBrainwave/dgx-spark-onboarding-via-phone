@@ -15,7 +15,22 @@ def create_app(handlers: Handlers) -> web.Application:
             result = {"v": 1, "id": "", "ok": False, "err": {"code": "BAD_REQUEST", "msg": str(exc), "detail": {}}}
         return web.json_response(result)
 
-    async def probe(_: web.Request) -> web.Response:
+    async def apple_probe(_: web.Request) -> web.Response:
+        if await handlers.provisioning_online():
+            return web.Response(
+                text="<HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>",
+                content_type="text/html",
+            )
+        raise web.HTTPFound("/portal/")
+
+    async def android_probe(_: web.Request) -> web.Response:
+        if await handlers.provisioning_online():
+            return web.Response(status=204)
+        raise web.HTTPFound("/portal/")
+
+    async def windows_probe(_: web.Request) -> web.Response:
+        if await handlers.provisioning_online():
+            return web.Response(text="Microsoft Connect Test")
         raise web.HTTPFound("/portal/")
 
     async def portal(_: web.Request) -> web.Response:
@@ -23,7 +38,13 @@ def create_app(handlers: Handlers) -> web.Application:
 
     app.router.add_post("/api/v1", api)
     app.router.add_get("/portal/", portal)
-    app.router.add_get("/hotspot-detect.html", probe)
-    app.router.add_get("/generate_204", probe)
-    app.router.add_get("/connecttest.txt", probe)
+    async def catch_all(request: web.Request) -> web.Response:
+        if request.host not in {"localhost:8080", "127.0.0.1:8080"}:
+            raise web.HTTPFound("/portal/")
+        raise web.HTTPNotFound()
+
+    app.router.add_get("/hotspot-detect.html", apple_probe)
+    app.router.add_get("/generate_204", android_probe)
+    app.router.add_get("/connecttest.txt", windows_probe)
+    app.router.add_get("/{tail:.*}", catch_all)
     return app

@@ -44,6 +44,8 @@ class Handlers:
                 return error(message_id, "BAD_REQUEST")
             self.sid = secrets.token_urlsafe(18)
             return response(message_id, {"sid": self.sid, "device_pubkey": self.device_public, "nonce": device_nonce})
+        if op not in {"wifi.scan", "wifi.connect", "wifi.status", "wifi.forget", "device.claim", "device.rename", "device.factory_reset"}:
+            return error(message_id, "UNKNOWN_OPERATION")
         if request.get("sid") != self.sid:
             return error(message_id, "SESSION_EXPIRED")
         if op == "wifi.scan":
@@ -76,3 +78,6 @@ class Handlers:
                 return error(message_id, "UNAUTHORIZED")
             return response(message_id, {"name": body.get("name", "DGX Spark")})
         return error(message_id, "UNKNOWN_OPERATION")
+
+    async def provisioning_online(self) -> bool:
+        return (await self.driver.status()).phase == "online"
