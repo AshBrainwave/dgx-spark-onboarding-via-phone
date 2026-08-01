@@ -2,7 +2,7 @@
 
 **Overall:** in_progress
 **Current step:** Part A2 — blocked on non-interactive privilege for NetworkManager/system installation
-**Updated:** 2026-08-01T23:13:46Z
+**Updated:** 2026-08-01T23:22:22Z
 
 ## Verification matrix
 
@@ -21,6 +21,7 @@
 - [ ] 8. Hardware networking (`v0.4-hw`)
 
 ## Done since last update
+- A4 read-only hardware comparison found that the original D-Bus scan emitted duplicate BSSIDs, lost hidden BSSIDs and multi-band information, mislabeled 6 GHz/WPA3/802.1X, and treated NetworkManager quality percent as dBm. Fixed scan normalization using the real Spark flag/frequency shapes, added WPA3 SAE connection selection, and added regression coverage; Mac lint and all 16 tests pass.
 - Fixed hardware deployment defects found before A2: the package now installs a real `sparkd-provision` CLI; `first-boot.sh` discovers and validates the NetworkManager Wi-Fi interface instead of assuming `wlan0`; the isolated production venv includes GPIO support; and systemd uses the detected interface plus captive-portal port 80. The installer enables but does not start the service. Mac lint and all 15 tests pass.
 - A1 hardware survey: NetworkManager owns connected `wlP9s9`; Wi-Fi and Bluetooth are enabled/unblocked; BlueZ is powered and supports peripheral role with 16 advertising instances; NetworkManager, Bluetooth, systemd-resolved, and Avahi are active/enabled.
 - A1 AP+STA gate: the real wiphy advertises `#{ managed, P2P-client } <= 2, #{ AP } <= 1, #{ P2P-device } <= 1, total <= 3, #channels <= 1`. The production D-Bus driver selected `wlP9s9` and correctly reported `supports_concurrent_ap_sta=True`.
@@ -59,10 +60,12 @@
 - Nothing blocks simulator work.
 - Hardware mutation is blocked for this orchestrated SSH session: `sudo -n true` requires a password, and `nmcli general permissions` reports `auth`/`no` for scan, network control, protected sharing, and connection modification. A2 cannot safely activate a SoftAP and systemd/BlueZ/GPIO assets cannot be installed until `nbutme` has non-interactive privilege for this pass.
 - Spark-side BLE advertising/GATT validation requires the agent to be deployed and advertising. The Mac side is ready and its CoreBluetooth permission is verified; no Android device is needed for Part C.
-- Hardware-networking D-Bus activation, SoftAP, DNS, mDNS, and handoff behavior remain unrun pending the A1 survey.
+- Hardware-networking D-Bus activation, SoftAP, DNS, mDNS, and handoff behavior remain unrun pending non-interactive privilege.
+- A4 forced rescan and exact RSSI validation remain blocked on privilege. NetworkManager exposes scan `Strength` as quality percent, not raw dBm; the corrected driver reports a conventional estimate until a raw NL80211 RSSI source is implemented and verified.
 - The physical reset implementation needs the Spark carrier-board GPIO chip/line and an actual button press for validation. Real BlueZ advertising/GATT, AP recovery, Avahi publishing, and mutating D-Bus networking validation remain unrun.
 
 ## Decisions I made that the spec didn't cover
+- Preserved the protocol's `rssi` field by converting NetworkManager quality percent to an explicitly documented estimate (`quality / 2 - 100`) rather than continuing to mislabel `quality - 100` as real dBm. This remains a known spec gap pending raw NL80211 data.
 - Used the complete `iw phy` output for the A1 gate because the hardware plan's suggested `sed` range stops after the first combination and hides the second, AP-capable combination.
 - The simulator starts with HTTP on `localhost:8080`; production SoftAP uses NetworkManager shared mode when hardware mode is selected.
 - The simulator accepts both documented uppercase `SPARK_SIM_FAIL` error codes and concise aliases. `WIFI_NO_INTERNET` proceeds to LAN-only success by design.

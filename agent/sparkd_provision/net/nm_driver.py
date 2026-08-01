@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Iterable
+from dataclasses import replace
 from typing import Any
 
 from dbus_fast import BusType, Message, MessageType, Variant
@@ -26,6 +27,92 @@ NM_SETTINGS = "org.freedesktop.NetworkManager.Settings"
 NM_AP = "org.freedesktop.NetworkManager.AccessPoint"
 PROPERTIES = "org.freedesktop.DBus.Properties"
 WIFI_DEVICE_TYPE = 2
+AP_FLAGS_PRIVACY = 0x00000001
+SEC_KEY_MGMT_PSK = 0x00000100
+SEC_KEY_MGMT_802_1X = 0x00000200
+SEC_KEY_MGMT_SAE = 0x00000400
+SEC_KEY_MGMT_OWE = 0x00000800
+SEC_KEY_MGMT_OWE_TM = 0x00001000
+SEC_KEY_MGMT_EAP_SUITE_B_192 = 0x00002000
+
+
+def _band(frequency: int) -> str:
+    if frequency >= 5925:
+        return "6ghz"
+    if frequency >= 4900:
+        return "5ghz"
+    return "2.4ghz"
+
+
+def _quality_to_rssi(strength: int) -> int:
+    quality = max(0, min(100, strength))
+    return round(quality / 2 - 100)
+
+
+def _security(flags: int, wpa_flags: int, rsn_flags: int) -> tuple[str, bool, str | None]:
+    key_management = wpa_flags | rsn_flags
+    if key_management & (SEC_KEY_MGMT_802_1X | SEC_KEY_MGMT_EAP_SUITE_B_192):
+        return "wpa2-enterprise", True, "802.1X enterprise Wi-Fi is not supported by this PoC"
+    if key_management & (SEC_KEY_MGMT_OWE | SEC_KEY_MGMT_OWE_TM):
+        return "open", True, "Enhanced Open (OWE) is not supported by this PoC"
+    if key_management & SEC_KEY_MGMT_SAE:
+        return "wpa3-sae", False, None
+    if key_management & SEC_KEY_MGMT_PSK:
+        return "wpa2-psk", False, None
+    if flags & AP_FLAGS_PRIVACY:
+        return "wep", False, None
+    return "open", False, None
+
+
+def _network_from_properties(values: dict[str, Any]) -> Network:
+    ssid = NetworkManagerDriver._ssid(values.get("Ssid", b""))
+    strength = max(0, min(100, int(values.get("Strength", 0))))
+    # NetworkManager exposes quality percent, not dBm. Its conventional inverse
+    # maps 0..100 quality to approximately -100..-50 dBm.
+    rssi = _quality_to_rssi(strength)
+    if rssi >= -60:
+        bars = 4
+    elif rssi >= -70:
+        bars = 3
+    elif rssi >= -80:
+        bars = 2
+    elif rssi >= -90:
+        bars = 1
+    else:
+        bars = 0
+    security, unsupported, reason = _security(
+        int(values.get("Flags", 0)),
+        int(values.get("WpaFlags", 0)),
+        int(values.get("RsnFlags", 0)),
+    )
+    return Network(
+        ssid=ssid,
+        bssid=str(values.get("HwAddress", "")),
+        rssi=rssi,
+        bars=bars,
+        security=security,
+        band=_band(int(values.get("Frequency", 0))),
+        hidden=not bool(ssid),
+        unsupported=unsupported,
+        reason=reason,
+    )
+
+
+def _deduplicate_networks(networks: list[Network]) -> list[Network]:
+    strongest: dict[str, Network] = {}
+    bands: dict[str, set[str]] = {}
+    for network in networks:
+        # Empty SSIDs reveal no identity to deduplicate on, so retain each BSSID.
+        key = network.ssid if network.ssid else f"\0{network.bssid}"
+        bands.setdefault(key, set()).add(network.band)
+        if key not in strongest or network.rssi > strongest[key].rssi:
+            strongest[key] = network
+    band_order = {"2.4ghz": 0, "5ghz": 1, "6ghz": 2}
+    normalized = []
+    for key, network in strongest.items():
+        seen_bands = sorted(bands[key], key=band_order.__getitem__)
+        normalized.append(replace(network, bands=seen_bands if len(seen_bands) > 1 else None))
+    return sorted(normalized, key=lambda item: item.rssi, reverse=True)
 
 
 class NetworkManagerError(RuntimeError):
@@ -74,7 +161,11 @@ class NetworkManagerDriver(NetDriver):
             )
             info, _ = await process.communicate()
             phy = next(
-                (line.split()[1] for line in info.decode().splitlines() if line.strip().startswith("wiphy ")),
+                (
+                    line.split()[1]
+                    for line in info.decode().splitlines()
+                    if line.strip().startswith("wiphy ")
+                ),
                 None,
             )
             if phy is None:
@@ -131,24 +222,9 @@ class NetworkManagerDriver(NetDriver):
         networks: list[Network] = []
         for path in access_points:
             values = await self._properties(path, NM_AP)
-            ssid = self._ssid(values.get("Ssid", b""))
-            if not ssid:
-                continue
-            frequency = int(values.get("Frequency", 0))
-            band = "2.4ghz" if frequency < 5000 else "5ghz"
-            protected = int(values.get("WpaFlags", 0)) or int(values.get("RsnFlags", 0))
-            networks.append(
-                Network(
-                    ssid=ssid,
-                    bssid=str(values.get("HwAddress", "")),
-                    rssi=int(values.get("Strength", 0)) - 100,
-                    bars=max(1, min(4, round(int(values.get("Strength", 0)) / 25))),
-                    security="wpa2-psk" if protected else "open",
-                    band=band,
-                )
-            )
+            networks.append(_network_from_properties(values))
         self._status = LinkStatus()
-        return sorted(networks, key=lambda item: item.rssi, reverse=True)
+        return _deduplicate_networks(networks)
 
     async def connect(self, ssid: str, psk: str, security: str, hidden: bool = False) -> None:
         if security == "wpa2-enterprise":
@@ -169,7 +245,7 @@ class NetworkManagerDriver(NetDriver):
         }
         if security != "open":
             settings["802-11-wireless-security"] = {
-                "key-mgmt": _variant("s", "wpa-psk"),
+                "key-mgmt": _variant("s", "sae" if security == "wpa3-sae" else "wpa-psk"),
                 "psk": _variant("s", psk),
             }
         connection = await self._call(
@@ -187,7 +263,7 @@ class NetworkManagerDriver(NetDriver):
             active_ap = await self._property(self.device_path, NM_WIRELESS, "ActiveAccessPoint")
             rssi = None
             if active_ap != "/":
-                rssi = int(await self._property(active_ap, NM_AP, "Strength")) - 100
+                rssi = _quality_to_rssi(int(await self._property(active_ap, NM_AP, "Strength")))
             self._status = LinkStatus(
                 phase="online", ssid=self._status.ssid, ip=ip, gw=gateway, dns=dns, rssi=rssi
             )

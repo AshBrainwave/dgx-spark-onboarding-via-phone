@@ -12,6 +12,7 @@ from sparkd_provision.ble_peripheral import BleProtocolBridge, _decode, _encode
 from sparkd_provision.net import mock_driver
 from sparkd_provision.net.capabilities import supports_concurrent_ap_sta
 from sparkd_provision.net.mock_driver import MockDriver
+from sparkd_provision.net.nm_driver import _deduplicate_networks, _network_from_properties
 from sparkd_provision.portal.dns import answer_a_query
 from sparkd_provision.protocol.crypto import (
     b64url,
@@ -210,6 +211,70 @@ def test_hardware_installer_uses_detected_interface_and_port_80() -> None:
     assert "wlan0" not in service
     assert "nmcli -t -f DEVICE,TYPE device status" in installer
     assert "agent[hardware]" in installer
+
+
+def test_real_networkmanager_scan_shapes_are_normalized() -> None:
+    rows = [
+        {
+            "Ssid": b"Droid",
+            "HwAddress": "0C:EF:15:D3:98:9C",
+            "Frequency": 2437,
+            "Strength": 70,
+            "Flags": 0x3,
+            "WpaFlags": 0,
+            "RsnFlags": 0x588,
+        },
+        {
+            "Ssid": b"Droid",
+            "HwAddress": "0C:EF:15:D3:98:9D",
+            "Frequency": 5240,
+            "Strength": 57,
+            "Flags": 0x3,
+            "WpaFlags": 0,
+            "RsnFlags": 0x588,
+        },
+        {
+            "Ssid": b"Droid",
+            "HwAddress": "2E:EF:15:D3:99:59",
+            "Frequency": 6295,
+            "Strength": 32,
+            "Flags": 0x1,
+            "WpaFlags": 0,
+            "RsnFlags": 0x488,
+        },
+        {
+            "Ssid": b"Enterprise",
+            "HwAddress": "0E:FE:7B:42:E4:AE",
+            "Frequency": 5785,
+            "Strength": 24,
+            "Flags": 0x1,
+            "WpaFlags": 0,
+            "RsnFlags": 0x288,
+        },
+        {
+            "Ssid": b"",
+            "HwAddress": "16:EF:15:D3:98:9C",
+            "Frequency": 2437,
+            "Strength": 69,
+            "Flags": 0x1,
+            "WpaFlags": 0,
+            "RsnFlags": 0x188,
+        },
+    ]
+
+    networks = _deduplicate_networks([_network_from_properties(row) for row in rows])
+    droid = next(network for network in networks if network.ssid == "Droid")
+    enterprise = next(network for network in networks if network.ssid == "Enterprise")
+    hidden = next(network for network in networks if network.hidden)
+
+    assert droid.bssid == "0C:EF:15:D3:98:9C"
+    assert droid.rssi == -65
+    assert droid.security == "wpa3-sae"
+    assert droid.bands == ["2.4ghz", "5ghz", "6ghz"]
+    assert enterprise.security == "wpa2-enterprise"
+    assert enterprise.unsupported is True
+    assert hidden.ssid == ""
+    assert hidden.security == "wpa2-psk"
 
 
 def test_captive_dns_answers_any_a_query_with_ap_address() -> None:
