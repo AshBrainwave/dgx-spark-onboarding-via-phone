@@ -2,7 +2,7 @@
 name = "sparkd-provision"
 version = "0.1.0"
 requires-python = ">=3.11"
-dependencies = ["aiohttp>=3.10", "cryptography>=43", "qrcode[pil]>=8.0"]
+dependencies = ["aiohttp>=3.10", "cryptography>=43", "dbus-fast>=2.21", "qrcode[pil]>=8.0"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "pytest-asyncio>=0.24", "ruff>=0.8"]

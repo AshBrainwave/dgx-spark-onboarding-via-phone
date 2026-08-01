@@ -1,7 +1,7 @@
+import asyncio
 import json
 import random
 import struct
-import asyncio
 from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
@@ -29,9 +29,14 @@ async def test_mock_driver_accepts_every_documented_wifi_failure(monkeypatch) ->
 
     monkeypatch.setattr(mock_driver.asyncio, "sleep", no_delay)
     codes = (
-        "WIFI_AUTH_FAILED", "WIFI_SSID_NOT_FOUND", "WIFI_WEAK_SIGNAL",
-        "WIFI_DHCP_FAILED", "WIFI_NO_INTERNET", "WIFI_CAPTIVE_PORTAL",
-        "WIFI_ENTERPRISE_UNSUPPORTED", "WIFI_BAND_MISMATCH",
+        "WIFI_AUTH_FAILED",
+        "WIFI_SSID_NOT_FOUND",
+        "WIFI_WEAK_SIGNAL",
+        "WIFI_DHCP_FAILED",
+        "WIFI_NO_INTERNET",
+        "WIFI_CAPTIVE_PORTAL",
+        "WIFI_ENTERPRISE_UNSUPPORTED",
+        "WIFI_BAND_MISMATCH",
         "DEVICE_LOST_AFTER_HANDOFF",
     )
     for code in codes:
@@ -61,18 +66,40 @@ def test_x25519_and_aes_gcm_round_trip() -> None:
     client_key = derive_key(client_private, device_public, client_nonce, device_nonce)
     device_key = derive_key(device_private, client_public, client_nonce, device_nonce)
     assert client_key == device_key
-    assert decrypt_psk(device_key, "Home", encrypt_psk(client_key, 1, "Home", "not-a-real-password")) == "not-a-real-password"
+    assert (
+        decrypt_psk(device_key, "Home", encrypt_psk(client_key, 1, "Home", "not-a-real-password"))
+        == "not-a-real-password"
+    )
 
 
 async def test_handler_decrypts_ciphertext_without_password_on_wire() -> None:
     handlers = Handlers(MockDriver())
     client_private, client_public = generate_keypair()
     client_nonce = b64url(b"c" * 16)
-    opened = await handlers.handle({"v": 1, "id": "open", "op": "session.open", "sid": None, "body": {"client_pubkey": client_public, "nonce": client_nonce}})
+    opened = await handlers.handle(
+        {
+            "v": 1,
+            "id": "open",
+            "op": "session.open",
+            "sid": None,
+            "body": {"client_pubkey": client_public, "nonce": client_nonce},
+        }
+    )
     session = opened["body"]
     key = derive_key(client_private, session["device_pubkey"], client_nonce, session["nonce"])
     password = "secret123"
-    request = {"v": 1, "id": "connect", "op": "wifi.connect", "sid": session["sid"], "body": {"ssid": "Malegaonkar-5G", "security": "wpa2-psk", "psk_enc": encrypt_psk(key, 1, "Malegaonkar-5G", password), "hidden": False}}
+    request = {
+        "v": 1,
+        "id": "connect",
+        "op": "wifi.connect",
+        "sid": session["sid"],
+        "body": {
+            "ssid": "Malegaonkar-5G",
+            "security": "wpa2-psk",
+            "psk_enc": encrypt_psk(key, 1, "Malegaonkar-5G", password),
+            "hidden": False,
+        },
+    }
     assert password not in json.dumps(request)
     accepted = await handlers.handle(request)
     assert accepted["ok"] is True
@@ -136,12 +163,21 @@ def test_shared_crypto_vectors_match_protocol_ciphertext() -> None:
     vector_path = Path(__file__).parents[2] / "protocol" / "crypto-vectors.json"
     for vector in json.loads(vector_path.read_text()):
         private = X25519PrivateKey.from_private_bytes(unb64url(vector["client_private"]))
-        key = derive_key(private, vector["device_public"], vector["client_nonce"], vector["device_nonce"])
-        assert encrypt_psk(key, vector["counter"], vector["ssid"], vector["psk"]) == vector["ciphertext"]
+        key = derive_key(
+            private, vector["device_public"], vector["client_nonce"], vector["device_nonce"]
+        )
+        assert (
+            encrypt_psk(key, vector["counter"], vector["ssid"], vector["psk"])
+            == vector["ciphertext"]
+        )
 
 
 def test_captive_dns_answers_any_a_query_with_ap_address() -> None:
-    query = struct.pack("!HHHHHH", 123, 0x0100, 1, 0, 0, 0) + b"\x07example\x03com\x00" + struct.pack("!HH", 1, 1)
+    query = (
+        struct.pack("!HHHHHH", 123, 0x0100, 1, 0, 0, 0)
+        + b"\x07example\x03com\x00"
+        + struct.pack("!HH", 1, 1)
+    )
     response = answer_a_query(query, b"\xc0\x00\x02\x01")
     assert response is not None
     assert response[-4:] == b"\xc0\x00\x02\x01"

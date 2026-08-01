@@ -13,3 +13,14 @@
   absent from advertisements cannot be selected. Detect Android Location Services scan
   failures, reconnect once on `gattserverdisconnected`, and warn developers that Chrome may
   cache a restarted GATT table.
+
+## NetworkManager ownership
+
+Hardware mode uses NetworkManager's system D-Bus API through `dbus-fast`, never parsed
+`nmcli` output. At startup it selects a Wi-Fi device (or the interface given with
+`--interface`) and fails with an actionable error if NetworkManager does not own it. This is
+intentional: provisioning must not race netplan or another network manager for the radio.
+
+The SoftAP profile uses NetworkManager AP mode, WPA2, a 2.4 GHz `bg` band, and
+`ipv4.method=shared`; NetworkManager then supplies DHCP and NAT. Hardware validation is
+required before claiming this profile works on a specific radio.
