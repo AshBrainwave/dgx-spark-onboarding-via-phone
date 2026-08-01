@@ -1,0 +1,1 @@
+export function Reconnect({ ssid, seconds }: { ssid: string; seconds: number }) { return <section><h2>Reconnect to {ssid}</h2><p>The Spark needs to leave its setup Wi-Fi. Join your home network now; we’ll look for it for {seconds} seconds.</p><p className="countdown">{seconds}</p></section>; }

@@ -9,6 +9,14 @@ from sparkd_provision.api.handlers import Handlers
 def create_app(handlers: Handlers) -> web.Application:
     app = web.Application()
 
+    @web.middleware
+    async def cors(request: web.Request, handler: web.RequestHandler) -> web.StreamResponse:
+        response = await handler(request)
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        return response
+
+    app.middlewares.append(cors)
+
     async def api(request: web.Request) -> web.Response:
         try:
             result = await handlers.handle(await request.json())

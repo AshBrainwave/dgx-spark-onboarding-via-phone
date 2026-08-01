@@ -10,3 +10,7 @@ hash is persisted. PSKs are never logged, persisted outside NetworkManager, or r
 status APIs.
 
 Out of scope: hardware attestation, portal TLS, and cloud account binding.
+
+Malformed or stale AES-GCM ciphertext (including a key rotation between retries) returns
+`INVALID_CIPHERTEXT`; it must never escape as an HTTP 500. This also makes truncated BLE
+reassembly safe to report as a protocol error.

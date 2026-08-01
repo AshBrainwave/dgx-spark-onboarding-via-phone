@@ -1,0 +1,4 @@
+import type { Network } from "../protocol/messages";
+export function ChooseNetwork({ networks, scannedAt, onChoose, onRefresh, onOther }: { networks: Network[]; scannedAt?: string; onChoose: (network: Network) => void; onRefresh: () => void; onOther: () => void }) {
+  return <section><h2>Choose network</h2><p className="muted">{scannedAt ? `Scanned ${new Date(scannedAt).toLocaleTimeString()}` : "Scanning…"}</p>{networks.map(network => <button className="network" key={network.ssid} disabled={network.unsupported} onClick={() => onChoose(network)}><span>{"▂▄▆█".slice(0, network.bars)} {network.ssid}</span><span>{network.security === "open" ? "" : " 🔒"} <em>{network.band}</em></span>{network.unsupported && <small>Not supported yet</small>}</button>)}<button className="secondary" onClick={onOther}>Other network…</button><button className="secondary" onClick={onRefresh}>Refresh networks</button></section>;
+}

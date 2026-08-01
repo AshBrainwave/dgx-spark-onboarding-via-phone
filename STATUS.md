@@ -1,14 +1,14 @@
 # DGX Spark Onboarding — Build Status
 
 **Overall:** in_progress
-**Current step:** 2 — Protocol security integration
-**Updated:** 2026-08-01T07:55:00Z
+**Current step:** 5 — Simulator completion
+**Updated:** 2026-08-01T21:43:00Z
 
 ## Milestones
 - [x] 1. Repo skeleton + CI — clean-clone Python and browser test commands passed
 - [x] 2. Protocol + framing — live HTTP crypto, QR-key comparison, shared fixtures, framing fuzz coverage, and cross-language crypto vectors are verified
 - [x] 3. Mock driver + HTTP portal — captive probes and DNS answer generation are verified in the simulator
-- [ ] 4. App screens — basic flow exists, but required screen components, QR scanning, and FSM are missing
+- [x] 4. App screens — guarded FSM, ten standalone review routes, QR scanner/manual fallback, progress UI, and error routes are typechecked and unit tested
 - [ ] 5. Simulator (`v0.1-sim`)
 - [ ] 6. Error screens (`v0.2-errors`)
 - [ ] 7. BLE (`v0.3-ble`)
@@ -29,6 +29,8 @@
 - Added shared fixed X25519/HKDF/AES-GCM vectors; Python: 7 passed, TypeScript: 2 passed (`c487660`)
 - Added captive SoftAP DNS A-query response coverage; `agent/.venv/bin/python -m pytest`: 8 passed (`ee4f28b`)
 - Verified a clean clone with `uv sync --extra dev`, Python tests (8 passed), `npm ci`, browser tests (2 passed), and TypeScript typecheck (pending commit)
+- Built the app screen flow and error taxonomy; `npm test -- --run` (5 passed), `npm run typecheck`, and `npm run build` passed
+- Extended mock failure injection for all Wi-Fi outcomes and session/transport failures; simulator launch succeeded with `SPARK_SIM_FAIL=WIFI_AUTH_FAILED SPARK_SIM_CONCURRENT_AP_STA=0`
 
 ## Blocked
 - Nothing blocks simulator work.
@@ -39,4 +41,8 @@
 - Hardware validation will start at the BLE and NetworkManager milestones, after the simulator contract is complete.
 
 ## Next
-- Split the browser flow into the required screens and implement its finite-state machine.
+- Verify the simulator from a genuinely fresh temporary clone in a browser, including the default flow and every `SPARK_SIM_FAIL` error route; only then tag `v0.1-sim` and `v0.2-errors`.
+- Implement BLE loopback framing and then validate against Android Chrome and the real Spark (Priority 6).
+- Implement NetworkManager D-Bus driver, AP mode, mDNS, and real captive portal behavior (Priority 7).
+- Implement runtime AP+STA handoff and recovery behavior (Priority 8).
+- Implement persistent first-boot/systemd provisioning lifecycle, physical reset, claim lock, and rate limits (Priority 9).

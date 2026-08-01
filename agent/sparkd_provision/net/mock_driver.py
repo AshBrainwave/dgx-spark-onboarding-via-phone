@@ -35,7 +35,22 @@ class MockDriver(NetDriver):
             for phase in ("associating", "authenticating", "dhcp", "verifying_internet"):
                 self._status = LinkStatus(phase=phase, ssid=ssid)
                 await asyncio.sleep(0.7)
-            code = {"auth": "WIFI_AUTH_FAILED", "dhcp": "WIFI_DHCP_FAILED", "timeout": "WIFI_SSID_NOT_FOUND", "weak": "WIFI_WEAK_SIGNAL", "captive": "WIFI_CAPTIVE_PORTAL"}.get(self.failure)
+            code = {
+                "auth": "WIFI_AUTH_FAILED",
+                "wifi_auth_failed": "WIFI_AUTH_FAILED",
+                "dhcp": "WIFI_DHCP_FAILED",
+                "wifi_dhcp_failed": "WIFI_DHCP_FAILED",
+                "timeout": "WIFI_SSID_NOT_FOUND",
+                "wifi_ssid_not_found": "WIFI_SSID_NOT_FOUND",
+                "weak": "WIFI_WEAK_SIGNAL",
+                "wifi_weak_signal": "WIFI_WEAK_SIGNAL",
+                "captive": "WIFI_CAPTIVE_PORTAL",
+                "wifi_captive_portal": "WIFI_CAPTIVE_PORTAL",
+                "wifi_no_internet": "WIFI_NO_INTERNET",
+                "wifi_band_mismatch": "WIFI_BAND_MISMATCH",
+                "wifi_enterprise_unsupported": "WIFI_ENTERPRISE_UNSUPPORTED",
+                "device_lost_after_handoff": "DEVICE_LOST_AFTER_HANDOFF",
+            }.get(self.failure)
             if code:
                 self._status = LinkStatus(phase="failed", ssid=ssid, err=code)
             else:

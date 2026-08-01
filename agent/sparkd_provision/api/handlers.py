@@ -33,6 +33,17 @@ class Handlers:
         if op == "device.info":
             return response(message_id, {"serial": self.serial, "model": "DGX Spark (sim)", "fw": "0.1.0", "state": "ADVERTISING", "capabilities": {"concurrent_ap_sta": self.driver.supports_concurrent_ap_sta}, "pubkey": self.device_public})
         if op == "session.open":
+            injected = getattr(self.driver, "failure", "")
+            if injected == "session_busy":
+                return error(message_id, "SESSION_BUSY")
+            if injected == "session_expired":
+                return error(message_id, "SESSION_EXPIRED")
+            if injected == "pubkey_mismatch":
+                return error(message_id, "PUBKEY_MISMATCH")
+            if injected == "ble_disconnected":
+                return error(message_id, "BLE_DISCONNECTED")
+            if injected == "portal_unreachable":
+                return error(message_id, "PORTAL_UNREACHABLE")
             if self.sid and request.get("sid") != self.sid:
                 return error(message_id, "SESSION_BUSY")
             client_public = body.get("client_pubkey")
@@ -54,6 +65,8 @@ class Handlers:
             networks = await self.driver.scan(bool(body.get("force")))
             return response(message_id, {"networks": [network_json(item) for item in networks], "scanned_at": datetime.now(UTC).isoformat()})
         if op == "wifi.connect":
+            if getattr(self.driver, "failure", "") == "wifi_enterprise_unsupported":
+                return error(message_id, "WIFI_ENTERPRISE_UNSUPPORTED")
             if body.get("security") == "wpa2-enterprise":
                 return error(message_id, "WIFI_ENTERPRISE_UNSUPPORTED")
             ciphertext = body.get("psk_enc")

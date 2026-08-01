@@ -1,17 +1,59 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Client } from "./protocol/client";
-import { HttpTransport } from "./transport/http";
+import { Client, ProtocolError } from "./protocol/client";
 import type { Network } from "./protocol/messages";
-import { errorCopy } from "./screens/errors";
+import { HttpTransport } from "./transport/http";
+import { Applying } from "./screens/Applying";
+import { ChooseNetwork } from "./screens/ChooseNetwork";
+import { Connecting } from "./screens/Connecting";
+import { ErrorScreen, errorCopy, type ErrorCode } from "./screens/errors";
+import { JoinAp } from "./screens/JoinAp";
+import { Password } from "./screens/Password";
+import { QrScanner } from "./screens/QrScanner";
+import { Reconnect } from "./screens/Reconnect";
+import { Success } from "./screens/Success";
+import { Welcome } from "./screens/Welcome";
 import "./style.css";
 
 const client = new Client(new HttpTransport());
+type Screen = "welcome" | "qr" | "join" | "connecting" | "networks" | "password" | "applying" | "reconnect" | "success" | "error";
+const knownError = (value: string): ErrorCode => value in errorCopy ? value as ErrorCode : "PORTAL_UNREACHABLE";
+
 function App() {
-  const [step, setStep] = useState("welcome"); const [networks, setNetworks] = useState<Network[]>([]); const [selected, setSelected] = useState<Network | null>(null); const [password, setPassword] = useState(""); const [message, setMessage] = useState("");
-  async function start() { setStep("connecting"); try { const info = await client.call("device.info"); const qrPubkey = new URLSearchParams(window.location.search).get("pubkey") ?? String(info.pubkey); await client.open(qrPubkey); const body = await client.call("wifi.scan", { force: false }); setNetworks(body.networks as Network[]); setStep("networks"); } catch (error) { setMessage(error instanceof Error && "code" in error ? String(error.code) : "PORTAL_UNREACHABLE"); setStep("error"); } }
-  async function connect() { if (!selected) return; await client.connectWifi(selected.ssid, selected.security, password); setStep("applying"); }
-  useEffect(() => { if (step !== "applying") return; const timer = setInterval(async () => { const body = await client.call("wifi.status"); const phase = String(body.phase); setMessage(`${phase.replaceAll("_", " ")} ${body.ssid ?? ""}`); if (phase === "online") { clearInterval(timer); setStep("success"); } if (phase === "failed") { clearInterval(timer); setMessage(String(body.err)); setStep("error"); } }, 500); return () => clearInterval(timer); }, [step]);
-  const currentError = errorCopy[message] ?? { title: "Setup needs attention", detail: message || "Could not reach the Spark simulator.", action: "Choose another network" };
-  return <main><h1>Set up your DGX Spark</h1>{step === "welcome" && <><p>Scan the chassis QR code, then connect your Spark to Wi-Fi.</p><button onClick={start}>Scan the QR code</button><p className="muted">Simulator: continue with the mock QR session.</p></>}{step === "connecting" && <p>Connecting securely to your Spark…</p>}{step === "networks" && <><h2>Choose network</h2>{networks.map(n => <button className="network" disabled={n.unsupported} key={n.ssid} onClick={() => { setSelected(n); setStep("password"); }}>{n.ssid} · {n.bars}/4 bars · {n.band}{n.unsupported ? ` — ${n.reason}` : ""}</button>)}<button onClick={start}>Refresh</button></>}{step === "password" && <><h2>{selected?.ssid}</h2><input aria-label="Wi-Fi password" autoComplete="current-password" autoCapitalize="none" autoCorrect="off" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Wi-Fi password"/><p className="muted">WPA2 passwords are 8–63 characters.</p><button onClick={connect}>Send credentials</button></>}{step === "applying" && <><h2>Connecting your Spark</h2><p>{message || "Sending credentials…"}</p></>}{step === "success" && <><h2>Spark is online</h2><p>192.168.1.44 · dgx-spark-sim.local</p><p>Next: open the Spark web UI or copy an SSH command.</p></>}{step === "error" && <><h2>{currentError.title}</h2><p>{currentError.detail}</p><button onClick={() => setStep(message === "WIFI_AUTH_FAILED" ? "password" : "networks")}>{currentError.action}</button></>}</main> }
+  const devScreen = new URLSearchParams(location.search).get("screen") as Screen | null;
+  const [screen, setScreen] = useState<Screen>(devScreen ?? "welcome");
+  const [networks, setNetworks] = useState<Network[]>([]); const [selected, setSelected] = useState<Network | null>(null);
+  const [scannedAt, setScannedAt] = useState(""); const [phase, setPhase] = useState("idle"); const [elapsed, setElapsed] = useState(0);
+  const [error, setError] = useState<ErrorCode>("PORTAL_UNREACHABLE"); const [ip, setIp] = useState("");
+  const concurrent = new URLSearchParams(location.search).get("concurrent") !== "0";
+  const selectedSsid = selected?.ssid ?? "Hidden network";
+  const fail = (reason: unknown) => { setError(knownError(reason instanceof ProtocolError ? reason.code : "PORTAL_UNREACHABLE")); setScreen("error"); };
+  const onQrParsed = () => {
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    if (!ios && "bluetooth" in navigator) openAndScan();
+    else setScreen("join");
+  };
+  async function openAndScan() { setScreen("connecting"); try { const info = await client.call("device.info"); const qrPubkey = new URLSearchParams(location.search).get("pubkey") ?? String(info.pubkey); await client.open(qrPubkey); await refresh(); } catch (reason) { fail(reason); } }
+  async function refresh() { try { const result = await client.call("wifi.scan", { force: true }); setNetworks(result.networks as Network[]); setScannedAt(String(result.scanned_at)); setScreen("networks"); } catch (reason) { fail(reason); } }
+  async function connect(password: string) { try { await client.connectWifi(selectedSsid, selected?.security ?? "wpa2-psk", password, !selected); setElapsed(0); setScreen("applying"); } catch (reason) { fail(reason); } }
+  useEffect(() => { if (screen !== "applying") return; const started = Date.now(); const timer = setInterval(async () => { setElapsed(Math.floor((Date.now() - started) / 1000)); try { const status = await client.call("wifi.status"); setPhase(String(status.phase)); if (status.phase === "online") { setIp(String(status.ip)); setScreen(concurrent ? "success" : "reconnect"); } if (status.phase === "failed") fail(new ProtocolError(String(status.err), "Wi-Fi failed")); } catch (reason) { fail(reason); } }, 500); return () => clearInterval(timer); }, [screen, concurrent]);
+  useEffect(() => { if (screen !== "reconnect") return; const timer = setTimeout(() => setScreen("success"), 5000); return () => clearTimeout(timer); }, [screen]);
+  const route = devScreen ?? screen;
+  const demoNetworks: Network[] = [{ ssid: "Home Wi-Fi", rssi: -40, bars: 4, security: "wpa2-psk", band: "2.4ghz" }];
+  const content = useMemo(() => {
+    switch (route) {
+      case "welcome": return <Welcome onScan={() => setScreen("qr")} />;
+      case "qr": return <QrScanner onParsed={onQrParsed} />;
+      case "join": return <JoinAp onJoined={openAndScan} />;
+      case "connecting": return <Connecting transport="portal" />;
+      case "networks": return <ChooseNetwork networks={networks.length ? networks : demoNetworks} scannedAt={scannedAt} onChoose={n => { setSelected(n); setScreen("password"); }} onRefresh={refresh} onOther={() => { setSelected(null); setScreen("password"); }} />;
+      case "password": return <Password ssid={selectedSsid} onSubmit={connect} />;
+      case "applying": return <Applying phase={phase} elapsed={elapsed} />;
+      case "reconnect": return <Reconnect ssid={selectedSsid} seconds={20} />;
+      case "success": return <Success ip={ip || "192.168.1.44"} hostname="dgx-spark-sim" onName={async name => { try { await client.call("device.rename", { name }); } catch { /* Naming is optional after success. */ } }} />;
+      case "error": return <ErrorScreen code={error} ssid={selected?.ssid} onBack={() => { const target = errorCopy[error].target; if (target === "password") setScreen("password"); else if (target === "join") setScreen("join"); else if (target === "abort") setScreen("welcome"); else if (target === "manual") setScreen("join"); else refresh(); }} />;
+    }
+  }, [route, networks, scannedAt, phase, elapsed, error, ip, selected]);
+  return <main>{content}<p className="dev-links">Review routes: {(["welcome", "qr", "join", "connecting", "networks", "password", "applying", "reconnect", "success", "error"] as Screen[]).map(name => <a key={name} href={`?screen=${name}`}>{name}</a>)}</p></main>;
+}
 createRoot(document.getElementById("root")!).render(<App />);
