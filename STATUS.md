@@ -20,14 +20,17 @@
 - Added transport-agnostic mock HTTP agent and framing test coverage (`b9df34a`)
 - Added simulator enrollment QR PNG and terminal rendering (`f551850`)
 - Added actionable simulator error copy (`e661660`)
+- Added X25519/HKDF/AES-GCM protocol primitives and Python round-trip coverage (pending commit)
 
 ## Blocked
 - GitHub push is blocked: `git push -u origin main` received HTTP 403 for `AshBrainwave`. Local commits continue normally.
-- Hardware availability, hosted deployment destination, account binding, and physical QR/display details need owner answers; simulator steps 1–6 are unaffected.
+- Hosted deployment destination, account binding, and physical QR/display details need owner answers. A real DGX Spark is available for validation after the simulator milestones.
 
 ## Decisions I made that the spec didn't cover
 - The simulator starts with HTTP on `localhost:8080`; production SoftAP and BLE remain deferred until their build-order steps.
+- Hardware validation will start at the BLE and NetworkManager milestones, after the simulator contract is complete.
 
 ## Next
 - Complete standalone routes and all distinct error screens.
-- Add crypto vectors and shared TS/Python message contract tests.
+- Wire encrypted PSKs through `session.open` and `wifi.connect` in the mock transport.
+- Add shared TS/Python message contract tests.
