@@ -2,7 +2,7 @@
 
 **Overall:** in_progress
 **Current step:** Hardware bring-up — waiting for the Spark SSH target; Mac-side work continues
-**Updated:** 2026-08-01T22:54:14Z
+**Updated:** 2026-08-01T22:55:20Z
 
 ## Verification matrix
 
@@ -21,6 +21,7 @@
 - [ ] 8. Hardware networking (`v0.4-hw`)
 
 ## Done since last update
+- Restored GitHub push access by switching this Mac checkout from the unauthorized HTTPS identity (`mash-falcon`) to the existing SSH identity (`AshBrainwave`); pushed `main` through `fdd05bf`.
 - Added the reusable macOS `bleak` central probe for advertising, GATT properties, real-MTU framing, timeout NAKs, encrypted provisioning, and truncated ciphertext. Its framing/codec self-test passes; CoreBluetooth detected 19 nearby BLE devices, proving macOS permission is active. Full Spark-side C1–C5 remains unrun until deployment.
 - Replaced the 35-line condensed `docs/SPEC.md` with the byte-identical 631-line authoritative build specification (`892edd4`).
 - Initial README check-in (`f3c54e8`)
@@ -50,7 +51,6 @@
 
 ## Blocked
 - Nothing blocks simulator work.
-- GitHub push is blocked: `git push origin main` failed with `remote: Permission to AshBrainwave/dgx-spark-onboarding-via-phone.git denied to mash-falcon` and HTTP 403. Local commits continue as required.
 - Spark deployment and hardware Parts A/D are waiting for the operator to provide a key-authenticated `user@hostname` or `user@IP` SSH target.
 - Spark-side BLE advertising/GATT validation requires the agent to be deployed and advertising. The Mac side is ready and its CoreBluetooth permission is verified; no Android device is needed for Part C.
 - Hardware-networking validation requires the Spark SSH target, NetworkManager, and its Wi-Fi radio. D-Bus activation, SoftAP, DNS, mDNS, and handoff behavior remain unrun.
