@@ -1,8 +1,8 @@
 # DGX Spark Onboarding — Build Status
 
 **Overall:** in_progress
-**Current step:** 7–9 — hardware bring-up requires a connection to the real Spark
-**Updated:** 2026-08-01T22:30:00Z
+**Current step:** Hardware bring-up — waiting for the Spark SSH target; Mac-side work continues
+**Updated:** 2026-08-01T22:48:06Z
 
 ## Verification matrix
 
@@ -21,6 +21,7 @@
 - [ ] 8. Hardware networking (`v0.4-hw`)
 
 ## Done since last update
+- Replaced the 35-line condensed `docs/SPEC.md` with the byte-identical 631-line authoritative build specification (`892edd4`).
 - Initial README check-in (`f3c54e8`)
 - Added skeleton, documentation, Apache-2.0 license, and CI (`fa6de1b`)
 - Added transport-agnostic mock HTTP agent and basic framing coverage (`b9df34a`)
@@ -48,6 +49,8 @@
 
 ## Blocked
 - Nothing blocks simulator work.
+- GitHub push is blocked: `git push origin main` failed with `remote: Permission to AshBrainwave/dgx-spark-onboarding-via-phone.git denied to mash-falcon` and HTTP 403. Local commits continue as required.
+- Spark deployment and hardware Parts A/D are waiting for the operator to provide a key-authenticated `user@hostname` or `user@IP` SSH target.
 - BLE validation requires the real Spark, a BlueZ-capable Linux Bluetooth adapter, and an Android phone. This workspace's `bluetoothctl show` fails with `Unable to open mgmt_socket`; no usable adapter is present.
 - Hardware-networking validation requires the Spark, NetworkManager, and a supported Wi-Fi radio. None is available in this workspace, so D-Bus activation, SoftAP, DNS, mDNS, and handoff behavior cannot yet be run.
 - Rechecked this pass: `bluetoothctl show` again returns `Unable to open mgmt_socket`; `nmcli` lists only `enp39s0`, `lo`, and `docker0`, with no wireless device.
