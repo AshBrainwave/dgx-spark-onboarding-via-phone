@@ -2,7 +2,7 @@
 
 **Overall:** in_progress
 **Current step:** 2 — Protocol security integration
-**Updated:** 2026-08-01T07:15:00Z
+**Updated:** 2026-08-01T07:25:00Z
 
 ## Milestones
 - [ ] 1. Repo skeleton + CI — CI has not been validated from a clean environment
@@ -24,7 +24,8 @@
 - Configured verified GitHub SSH access and pushed `main` (`5ea944f`)
 - Wired the live HTTP session to X25519/HKDF/AES-GCM and verified password-free request serialization (`7da6cc6`)
 - Ran `agent/.venv/bin/python -m pytest`: 5 passed; ran browser contract test: 1 passed (`fa71e07`)
-- Added verified captive-probe redirect handling and distinct malformed/unknown-operation errors (pending commit)
+- Added verified captive-probe redirect handling and distinct malformed/unknown-operation errors (`5e94158`)
+- Reproduced and fixed invalid AES-GCM tag handling; `agent/.venv/bin/python -m pytest`: 6 passed (pending commit)
 
 ## Blocked
 - Nothing blocks simulator work.

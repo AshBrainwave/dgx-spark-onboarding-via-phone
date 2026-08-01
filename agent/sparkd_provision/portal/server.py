@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from aiohttp import web
+from cryptography.exceptions import InvalidTag
 
 from sparkd_provision.api.handlers import Handlers
 
@@ -11,7 +12,7 @@ def create_app(handlers: Handlers) -> web.Application:
     async def api(request: web.Request) -> web.Response:
         try:
             result = await handlers.handle(await request.json())
-        except (ValueError, TypeError) as exc:
+        except (InvalidTag, ValueError, TypeError) as exc:
             result = {"v": 1, "id": "", "ok": False, "err": {"code": "BAD_REQUEST", "msg": str(exc), "detail": {}}}
         return web.json_response(result)
 
@@ -39,7 +40,10 @@ def create_app(handlers: Handlers) -> web.Application:
     app.router.add_post("/api/v1", api)
     app.router.add_get("/portal/", portal)
     async def catch_all(request: web.Request) -> web.Response:
-        if request.host not in {"localhost:8080", "127.0.0.1:8080"}:
+        sockname = request.transport.get_extra_info("sockname") if request.transport else None
+        bound_host, bound_port = sockname[:2] if sockname else (None, None)
+        expected_host = f"{bound_host}:{bound_port}" if bound_host and bound_port else None
+        if request.host != expected_host:
             raise web.HTTPFound("/portal/")
         raise web.HTTPNotFound()
 

@@ -5,6 +5,8 @@ import secrets
 from datetime import UTC, datetime
 from typing import Any
 
+from cryptography.exceptions import InvalidTag
+
 from sparkd_provision.net.driver import NetDriver
 from sparkd_provision.protocol.crypto import b64url, decrypt_psk, derive_key, generate_keypair
 from sparkd_provision.protocol.messages import error, network_json, response
@@ -60,7 +62,7 @@ class Handlers:
                 return error(message_id, "BAD_REQUEST")
             try:
                 psk = decrypt_psk(self.session_key, ssid, ciphertext)
-            except (ValueError, TypeError):
+            except (InvalidTag, ValueError, TypeError):
                 return error(message_id, "INVALID_CIPHERTEXT")
             await self.driver.connect(ssid, psk, body.get("security", "wpa2-psk"), bool(body.get("hidden")))
             return response(message_id, {"accepted": True})

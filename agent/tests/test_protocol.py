@@ -48,6 +48,31 @@ async def test_handler_decrypts_ciphertext_without_password_on_wire() -> None:
     assert accepted["ok"] is True
 
 
+async def test_tampered_ciphertext_returns_protocol_error() -> None:
+    handlers = Handlers(MockDriver())
+    _, client_public = generate_keypair()
+    opened = await handlers.handle(
+        {
+            "v": 1,
+            "id": "open",
+            "op": "session.open",
+            "sid": None,
+            "body": {"client_pubkey": client_public, "nonce": b64url(b"n" * 16)},
+        }
+    )
+    response = await handlers.handle(
+        {
+            "v": 1,
+            "id": "tampered",
+            "op": "wifi.connect",
+            "sid": opened["body"]["sid"],
+            "body": {"ssid": "Home", "security": "wpa2-psk", "psk_enc": b64url(b"x" * 40)},
+        }
+    )
+    assert response["ok"] is False
+    assert response["err"]["code"] == "INVALID_CIPHERTEXT"
+
+
 def test_framing_fuzzes_sizes_order_and_drops() -> None:
     randomizer = random.Random(20260801)
     for _ in range(100):
