@@ -1,14 +1,14 @@
 # DGX Spark Onboarding — Build Status
 
 **Overall:** in_progress
-**Current step:** Part A2 — retest SoftAP on a separate virtual AP interface
-**Updated:** 2026-08-01T23:41:28Z
+**Current step:** Part A3 — captive portal and wildcard DNS on the real AP address
+**Updated:** 2026-08-01T23:55:03Z
 
 ## Verification matrix
 
 | Verified on hardware | Verified in simulation only | Deferred (no Android) |
 | --- | --- | --- |
-| Spark aarch64/Python 3.12 portability gate; A1 NetworkManager ownership and AP+STA parser; Wi-Fi/Bluetooth rfkill state; A4 cached-airspace dedup/bands/6 GHz/security/hidden handling; Mac CoreBluetooth permission/preflight. | Protocol crypto/framing, mock driver, portal probes/DNS, app FSM/screens/error routes, simulator, NetworkManager/SoftAP implementation beyond A1/A4, BlueZ bridge, mDNS publisher, handoff recovery, lifecycle/reset logic, BLE central probe framing/codec self-test. | Chrome Web Bluetooth chooser, user-gesture handling, Location Services prompt, Chrome reconnect/service-cache behaviour, and Android SoftAP fallback/`.local` resolution. |
+| Spark aarch64/Python 3.12 portability gate; A1 NetworkManager ownership and AP+STA parser; Wi-Fi/Bluetooth rfkill state; A2 concurrent WPA2 SoftAP visibility/association/DHCP/AP address/NAT/STA preservation/PSK alphabet; A4 cached-airspace dedup/bands/6 GHz/security/hidden handling; Mac CoreBluetooth permission/preflight. | Protocol crypto/framing, mock driver, portal probes/DNS, app FSM/screens/error routes, simulator, BlueZ bridge, mDNS publisher, handoff recovery, lifecycle/reset logic, BLE central probe framing/codec self-test. | Chrome Web Bluetooth chooser, user-gesture handling, Location Services prompt, Chrome reconnect/service-cache behaviour, and Android SoftAP fallback/`.local` resolution. |
 
 ## Milestones
 - [x] 1. Repo skeleton + CI — clean-clone Python and browser test commands passed
@@ -21,6 +21,8 @@
 - [ ] 8. Hardware networking (`v0.4-hw`)
 
 ## Done since last update
+- A2 passes on real hardware at `7672ac1`: CoreWLAN found `DGX-Spark-3847` at -49 dBm on channel 6 and associated with WPA2; NetworkManager DHCP assigned the Mac `10.42.0.208`; the client reached the Spark at `10.42.0.1`; the Spark lease table recorded the client; HTTPS through the shared connection returned 200; nftables contained the `10.42.0.0/24` forwarding/masquerade rules; and `wlP9s9` stayed on `Droid_IoT` throughout. The persisted 12-character AP PSK contains none of `0/O/1/l/I`. Factory-reset rotation remains a Part D check.
+- macOS `networksetup -setairportnetwork` falsely reported that the visible Spark AP could not be found. The modern CoreWLAN association API succeeded immediately, proving this was a legacy Mac command failure rather than an AP failure; power-cycling the Mac Wi-Fi interface restored its saved home association and `192.168.68.73` afterward.
 - Fourth guarded A2 activation preserved STA/SSH and reached hostap configuration, but NetworkManager selected channel 6 while the STA was on channel 3; this wiphy permits only one concurrent channel, so activation timed out with `supplicant-timeout`. Fixed concurrent AP settings to derive and pin the exact active-STA channel (including tested 2.4/5/6 GHz mappings). Cleanup removed the test interface/profile; the STA remained online.
 - Third guarded A2 activation kept the STA/SSH intact but raced NetworkManager initialization: the new AP device path appeared while state was still strictly unmanaged, so activation was rejected. A controlled interface-only probe showed it transitions to normal `disconnected`; fixed readiness to wait for NetworkManager device state >= 30 before activation. Cleanup removed the temporary interface and unsaved profile.
 - Second guarded A2 activation proved the original concurrency implementation wrong: NetworkManager activated the AP on `wlP9s9`, replaced `Droid_IoT`, and dropped SSH. The one-shot 45-second recovery timer restored the exact STA UUID and reachability without polling. Fixed concurrent mode to create a separate bounded-name `__ap` interface, wait for NetworkManager ownership, activate an unsaved shared-mode AP profile on that device, and remove the profile/interface on teardown; all 18 Mac tests pass.
@@ -66,8 +68,8 @@
 ## Blocked
 - Nothing blocks simulator work.
 - Spark-side BLE advertising/GATT validation requires the agent to be deployed and advertising. The Mac side is ready and its CoreBluetooth permission is verified; no Android device is needed for Part C.
-- Hardware-networking D-Bus activation, SoftAP, DNS, mDNS, and handoff behavior remain unrun pending non-interactive privilege.
-- A4 forced rescan and exact RSSI validation remain blocked on privilege. NetworkManager exposes scan `Strength` as quality percent, not raw dBm; the corrected driver reports a conventional estimate until a raw NL80211 RSSI source is implemented and verified.
+- Captive DNS, portal probes, real join/error mapping, mDNS, and handoff behavior remain unrun on hardware.
+- A4 forced rescan and exact RSSI validation remain unrun. NetworkManager exposes scan `Strength` as quality percent, not raw dBm; the corrected driver reports a conventional estimate until a raw NL80211 RSSI source is implemented and verified.
 - The physical reset implementation needs the Spark carrier-board GPIO chip/line and an actual button press for validation. Real BlueZ advertising/GATT, AP recovery, Avahi publishing, and mutating D-Bus networking validation remain unrun.
 
 ## Decisions I made that the spec didn't cover
@@ -78,8 +80,7 @@
 - The simulator accepts both documented uppercase `SPARK_SIM_FAIL` error codes and concise aliases. `WIFI_NO_INTERNET` proceeds to LAN-only success by design.
 
 ## Next
-- Obtain non-interactive privilege for `nbutme`, install the hardware/systemd assets, and activate the A2 SoftAP with an SSH recovery guard.
-- On the Spark/Mac: validate SoftAP, captive DNS/probes, real scan/join/error mappings, Avahi, and both handoff paths (Part A).
+- On the Spark/Mac: validate captive DNS/probes, real scan/join/error mappings, Avahi, and the concurrent handoff path (Part A).
 - On the Mac: run the reusable BLE central probe against the Spark; defer only Android browser-layer validation.
 - Validate the non-concurrent recovery client on hardware: mDNS status polling, Android candidate-IP sweep/manual-IP fallback, and AP restoration within 20 seconds after every join failure (Priority 8).
 - Validate the configured physical-reset GPIO button and systemd first-boot/state recovery/claim-lock/rate-limit behavior on the Spark (Priority 9).
