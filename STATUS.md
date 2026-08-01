@@ -1,8 +1,14 @@
 # DGX Spark Onboarding — Build Status
 
-**Overall:** done
-**Current step:** 7–9 — all remaining acceptance work requires the real Spark hardware
-**Updated:** 2026-08-01T22:07:00Z
+**Overall:** in_progress
+**Current step:** 7–9 — hardware bring-up requires a connection to the real Spark
+**Updated:** 2026-08-01T22:30:00Z
+
+## Verification matrix
+
+| Verified on hardware | Verified in simulation only | Deferred (no Android) |
+| --- | --- | --- |
+| None in this workspace: no Spark host/SSH target, Wi-Fi radio, Bluetooth adapter, Avahi, or GPIO button is accessible. | Protocol crypto/framing, mock driver, portal probes/DNS, app FSM/screens/error routes, simulator, NetworkManager/SoftAP implementation, BlueZ bridge, mDNS publisher, handoff recovery, lifecycle/reset logic. | Chrome Web Bluetooth chooser, user-gesture handling, Location Services prompt, Chrome reconnect/service-cache behaviour, and Android SoftAP fallback/`.local` resolution. |
 
 ## Milestones
 - [x] 1. Repo skeleton + CI — clean-clone Python and browser test commands passed
@@ -46,13 +52,15 @@
 - Hardware-networking validation requires the Spark, NetworkManager, and a supported Wi-Fi radio. None is available in this workspace, so D-Bus activation, SoftAP, DNS, mDNS, and handoff behavior cannot yet be run.
 - Rechecked this pass: `bluetoothctl show` again returns `Unable to open mgmt_socket`; `nmcli` lists only `enp39s0`, `lo`, and `docker0`, with no wireless device.
 - The physical reset implementation needs the Spark carrier-board GPIO chip/line and an actual button press for validation. Real BlueZ advertising/GATT, NetworkManager AP+STA capability discovery, AP recovery, Avahi, and D-Bus networking validation remain blocked by this host's lack of Bluetooth and Wi-Fi hardware.
+- Hardware bring-up cannot start from this workspace because no Spark hostname/IP or remote shell connection has been configured. The Mac/iPhone/Spark operator steps in the hardware brief require execution at those devices.
 
 ## Decisions I made that the spec didn't cover
 - The simulator starts with HTTP on `localhost:8080`; production SoftAP uses NetworkManager shared mode when hardware mode is selected.
 - The simulator accepts both documented uppercase `SPARK_SIM_FAIL` error codes and concise aliases. `WIFI_NO_INTERNET` proceeds to LAN-only success by design.
 
 ## Next
-- Validate the BlueZ GATT peripheral with Android Chrome and the real Spark: service UUID must appear in the chooser advertisement, CTRL RX/TX must exchange fragmented encrypted envelopes, INFO must read, and disconnect must retry once (Priority 6).
-- Complete and validate hardware networking: exercise NetworkManager scan/join/AP, captive DNS/probes on the actual AP address, Avahi publication, and map observed NM state reasons to the full error taxonomy (Priority 7).
+- On the Spark: deploy the repository, install `agent[dev,hardware]`, run the Python suite, then record the A1 NetworkManager/Bluetooth/rfkill/port-53 survey and logs.
+- On the Spark/Mac: validate SoftAP, captive DNS/probes, real scan/join/error mappings, Avahi, and both handoff paths (Part A).
+- On the Mac: run the reusable BLE central probe against the Spark; defer only Android browser-layer validation.
 - Validate the non-concurrent recovery client on hardware: mDNS status polling, Android candidate-IP sweep/manual-IP fallback, and AP restoration within 20 seconds after every join failure (Priority 8).
 - Validate the configured physical-reset GPIO button and systemd first-boot/state recovery/claim-lock/rate-limit behavior on the Spark (Priority 9).
