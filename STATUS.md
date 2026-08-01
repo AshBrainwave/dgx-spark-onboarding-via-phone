@@ -2,11 +2,11 @@
 
 **Overall:** in_progress
 **Current step:** 2 — Protocol security integration
-**Updated:** 2026-08-01T06:55:00Z
+**Updated:** 2026-08-01T07:10:00Z
 
 ## Milestones
 - [ ] 1. Repo skeleton + CI — CI has not been validated from a clean environment
-- [ ] 2. Protocol + framing — primitives exist, but crypto is not in the live path and contract/fuzz coverage is missing ← in progress
+- [ ] 2. Protocol + framing — live HTTP crypto and QR-key comparison are verified; cross-language vectors and framing fuzz coverage are still missing ← in progress
 - [ ] 3. Mock driver + HTTP portal — basic HTTP API exists; captive probes and DNS are missing
 - [ ] 4. App screens — basic flow exists, but required screen components, QR scanning, and FSM are missing
 - [ ] 5. Simulator (`v0.1-sim`)
@@ -22,6 +22,7 @@
 - Added actionable simulator error copy (`e661660`)
 - Added unintegrated X25519/HKDF/AES-GCM protocol primitives (`5ea944f`)
 - Configured verified GitHub SSH access and pushed `main` (`5ea944f`)
+- Wired the live HTTP session to X25519/HKDF/AES-GCM and verified password-free request serialization (pending commit)
 
 ## Blocked
 - Nothing blocks simulator work.
@@ -32,6 +33,5 @@
 - Hardware validation will start at the BLE and NetworkManager milestones, after the simulator contract is complete.
 
 ## Next
-- Wire X25519/HKDF/AES-GCM and QR public-key verification through the HTTP simulator.
-- Install and execute the Python test suite, then add shared contract and framing fuzz coverage.
+- Add shared TypeScript/Python crypto vectors, protocol fixtures, and framing fuzz coverage.
 - Split the browser flow into the required screens and implement its finite-state machine.

@@ -1,4 +1,14 @@
-from sparkd_provision.protocol.crypto import decrypt_psk, derive_key, encrypt_psk, generate_keypair
+import json
+
+from sparkd_provision.api.handlers import Handlers
+from sparkd_provision.net.mock_driver import MockDriver
+from sparkd_provision.protocol.crypto import (
+    b64url,
+    decrypt_psk,
+    derive_key,
+    encrypt_psk,
+    generate_keypair,
+)
 from sparkd_provision.protocol.framing import Reassembler, fragment
 
 
@@ -14,7 +24,23 @@ def test_framing_round_trip() -> None:
 def test_x25519_and_aes_gcm_round_trip() -> None:
     client_private, client_public = generate_keypair()
     device_private, device_public = generate_keypair()
-    client_key = derive_key(client_private, device_public, "client", "device")
-    device_key = derive_key(device_private, client_public, "client", "device")
+    client_nonce = b64url(b"c" * 16)
+    device_nonce = b64url(b"d" * 16)
+    client_key = derive_key(client_private, device_public, client_nonce, device_nonce)
+    device_key = derive_key(device_private, client_public, client_nonce, device_nonce)
     assert client_key == device_key
     assert decrypt_psk(device_key, "Home", encrypt_psk(client_key, 1, "Home", "not-a-real-password")) == "not-a-real-password"
+
+
+async def test_handler_decrypts_ciphertext_without_password_on_wire() -> None:
+    handlers = Handlers(MockDriver())
+    client_private, client_public = generate_keypair()
+    client_nonce = b64url(b"c" * 16)
+    opened = await handlers.handle({"v": 1, "id": "open", "op": "session.open", "sid": None, "body": {"client_pubkey": client_public, "nonce": client_nonce}})
+    session = opened["body"]
+    key = derive_key(client_private, session["device_pubkey"], client_nonce, session["nonce"])
+    password = "secret123"
+    request = {"v": 1, "id": "connect", "op": "wifi.connect", "sid": session["sid"], "body": {"ssid": "Malegaonkar-5G", "security": "wpa2-psk", "psk_enc": encrypt_psk(key, 1, "Malegaonkar-5G", password), "hidden": False}}
+    assert password not in json.dumps(request)
+    accepted = await handlers.handle(request)
+    assert accepted["ok"] is True

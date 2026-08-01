@@ -27,7 +27,8 @@ def generate_keypair() -> tuple[X25519PrivateKey, str]:
 
 def derive_key(private: X25519PrivateKey, peer_public_b64: str, client_nonce: str, device_nonce: str) -> bytes:
     shared = private.exchange(X25519PublicKey.from_public_bytes(unb64url(peer_public_b64)))
-    return HKDF(algorithm=hashes.SHA256(), length=32, salt=(client_nonce + device_nonce).encode(), info=INFO).derive(shared)
+    salt = unb64url(client_nonce) + unb64url(device_nonce)
+    return HKDF(algorithm=hashes.SHA256(), length=32, salt=salt, info=INFO).derive(shared)
 
 
 def encrypt_psk(key: bytes, counter: int, ssid: str, psk: str) -> str:

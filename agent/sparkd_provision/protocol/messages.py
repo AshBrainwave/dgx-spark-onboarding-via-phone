@@ -15,6 +15,10 @@ ERROR_MESSAGES = {
     "WIFI_ENTERPRISE_UNSUPPORTED": "Enterprise Wi-Fi isn't supported yet.",
     "SESSION_BUSY": "Someone else is setting up this Spark.",
     "SESSION_EXPIRED": "Setup window closed for safety.",
+    "INVALID_CIPHERTEXT": "Credentials could not be decrypted.",
+    "PUBKEY_MISMATCH": "This isn't the Spark you scanned.",
+    "BAD_REQUEST": "Invalid provisioning request.",
+    "UNKNOWN_OPERATION": "Unknown provisioning operation.",
 }
 
 
