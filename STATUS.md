@@ -2,7 +2,7 @@
 
 **Overall:** in_progress
 **Current step:** Part A2 — retest SoftAP on a separate virtual AP interface
-**Updated:** 2026-08-01T23:36:25Z
+**Updated:** 2026-08-01T23:38:53Z
 
 ## Verification matrix
 
@@ -21,6 +21,7 @@
 - [ ] 8. Hardware networking (`v0.4-hw`)
 
 ## Done since last update
+- Third guarded A2 activation kept the STA/SSH intact but raced NetworkManager initialization: the new AP device path appeared while state was still strictly unmanaged, so activation was rejected. A controlled interface-only probe showed it transitions to normal `disconnected`; fixed readiness to wait for NetworkManager device state >= 30 before activation. Cleanup removed the temporary interface and unsaved profile.
 - Second guarded A2 activation proved the original concurrency implementation wrong: NetworkManager activated the AP on `wlP9s9`, replaced `Droid_IoT`, and dropped SSH. The one-shot 45-second recovery timer restored the exact STA UUID and reachability without polling. Fixed concurrent mode to create a separate bounded-name `__ap` interface, wait for NetworkManager ownership, activate an unsaved shared-mode AP profile on that device, and remove the profile/interface on teardown; all 18 Mac tests pass.
 - First A2 activation failed safely before changing the radio: `dbus-fast` 5 rejected a Python `list[int]` for D-Bus signature `ay` (`SignatureBodyMismatchError`, requires `bytes`). Fixed both STA and SoftAP SSID construction behind a tested helper; the recovery timer was cancelled and `Droid_IoT` remained active.
 - Root hardware identity discovery exposed the real platform serial `1983825003847`; hardware naming therefore uses suffix `3847` (`DGX-Spark-3847`), while unprivileged discovery correctly falls back to hostname.

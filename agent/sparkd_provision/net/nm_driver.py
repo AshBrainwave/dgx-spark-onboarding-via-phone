@@ -373,14 +373,15 @@ class NetworkManagerDriver(NetDriver):
     async def _ensure_ap_device(self) -> str:
         self._ap_interface = f"{self.interface[:11]}-ap"
         device = await self._device_path(self._ap_interface)
-        if device:
+        if device and int(await self._property(device, NM_DEVICE, "State")) >= 30:
             return device
-        await self._run_iw(
-            "dev", self.interface, "interface", "add", self._ap_interface, "type", "__ap"
-        )
+        if not device:
+            await self._run_iw(
+                "dev", self.interface, "interface", "add", self._ap_interface, "type", "__ap"
+            )
         for _ in range(50):
             device = await self._device_path(self._ap_interface)
-            if device:
+            if device and int(await self._property(device, NM_DEVICE, "State")) >= 30:
                 return device
             await asyncio.sleep(0.1)
         raise NetworkManagerError(

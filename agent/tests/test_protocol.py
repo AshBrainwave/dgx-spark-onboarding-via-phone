@@ -313,6 +313,10 @@ async def test_concurrent_softap_uses_a_separate_networkmanager_device() -> None
     async def run_iw(*arguments: str) -> None:
         iw_calls.append(arguments)
 
+    async def device_property(path: str, interface: str, name: str) -> int:
+        assert (path, interface, name) == ("/device/ap", "org.freedesktop.NetworkManager.Device", "State")
+        return 30
+
     async def call(
         path: str,
         interface: str,
@@ -334,6 +338,7 @@ async def test_concurrent_softap_uses_a_separate_networkmanager_device() -> None
         return None
 
     driver._device_path = device_path
+    driver._property = device_property
     driver._run_iw = run_iw
     driver._call = call
 
