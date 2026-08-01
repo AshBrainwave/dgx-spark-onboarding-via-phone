@@ -4,6 +4,7 @@ from pathlib import Path
 from aiohttp import web
 
 from sparkd_provision.api.handlers import Handlers
+from sparkd_provision.net.mdns import MdnsPublisher
 from sparkd_provision.net.mock_driver import MockDriver
 from sparkd_provision.net.nm_driver import NetworkManagerDriver
 from sparkd_provision.portal.server import create_app
@@ -23,6 +24,7 @@ def main() -> None:
     state = StateStore(state_path)
 
     async def runtime_app() -> web.Application:
+        mdns = None
         if args.mock:
             driver = MockDriver()
         else:
@@ -30,7 +32,13 @@ def main() -> None:
             # NetworkManager does not own it; do not fight netplan or another manager.
             driver = await NetworkManagerDriver.create(args.interface)
             await driver.softap_up(state.state.ap_ssid, state.state.ap_psk)
-        return create_app(Handlers(driver, state))
+            try:
+                mdns = await MdnsPublisher.create()
+            except (OSError, RuntimeError):
+                # Wi-Fi provisioning remains usable if Avahi is not installed; status
+                # is still available through the AP and direct LAN IP.
+                mdns = None
+        return create_app(Handlers(driver, state, mdns))
 
     web.run_app(runtime_app(), host=host, port=args.port)
 

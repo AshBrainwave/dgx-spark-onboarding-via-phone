@@ -8,6 +8,7 @@ from typing import Any
 from cryptography.exceptions import InvalidTag
 
 from sparkd_provision.net.driver import NetDriver
+from sparkd_provision.net.mdns import MdnsPublisher
 from sparkd_provision.protocol.crypto import b64url, decrypt_psk, derive_key, generate_keypair
 from sparkd_provision.protocol.messages import error, network_json, response
 from sparkd_provision.state import StateStore
@@ -16,9 +17,12 @@ from sparkd_provision.state import StateStore
 class Handlers:
     """The one transport-independent implementation of provisioning operations."""
 
-    def __init__(self, driver: NetDriver, state: StateStore | None = None) -> None:
+    def __init__(
+        self, driver: NetDriver, state: StateStore | None = None, mdns: MdnsPublisher | None = None
+    ) -> None:
         self.driver = driver
         self.state = state or StateStore()
+        self.mdns = mdns
         self.serial = "SIM-0001"
         self.device_private, self.device_public = generate_keypair()
         self.sid: str | None = None
@@ -102,6 +106,13 @@ class Handlers:
             return response(message_id, {"accepted": True})
         if op == "wifi.status":
             status = await self.driver.status()
+            if status.phase == "online" and self.mdns:
+                # Avahi owns conflict handling; a failed publisher must not make a
+                # successfully provisioned device appear to have failed Wi-Fi.
+                try:
+                    await self.mdns.publish("DGX Spark", "dgx-spark-0001.local")
+                except RuntimeError:
+                    pass
             if status.phase == "failed":
                 self._release_session()
             return response(message_id, status.__dict__)

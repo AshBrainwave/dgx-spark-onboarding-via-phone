@@ -28,3 +28,8 @@ required before claiming this profile works on a specific radio.
 At startup hardware mode creates (or restores) the AP from persisted state. Its WPA2 password
 is twelve characters from an alphabet excluding ambiguous `0/O` and `1/I/l`; it runs on the
 2.4 GHz `bg` band with NetworkManager shared IPv4. State storage is mode `0600`.
+
+After Wi-Fi is online, hardware mode attempts to publish `DGX Spark` as
+`_dgx-spark._tcp.local` through Avahi, with hostname `dgx-spark-0001.local` and portal port
+8080. An unavailable Avahi daemon does not invalidate a completed Wi-Fi join: direct LAN-IP
+status remains available and the missing advertisement is a deployment fault to surface.
