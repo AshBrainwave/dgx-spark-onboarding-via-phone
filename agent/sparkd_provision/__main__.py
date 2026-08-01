@@ -5,6 +5,7 @@ from aiohttp import web
 
 from sparkd_provision.api.handlers import Handlers
 from sparkd_provision.ble_peripheral import BluezPeripheral
+from sparkd_provision.config import DeviceIdentity
 from sparkd_provision.net.mdns import MdnsPublisher
 from sparkd_provision.net.mock_driver import MockDriver
 from sparkd_provision.net.nm_driver import NetworkManagerDriver
@@ -27,7 +28,8 @@ def main() -> None:
     args = parser.parse_args()
     host = args.host or ("127.0.0.1" if args.mock else "0.0.0.0")
     state_path = args.state_path or (None if args.mock else Path("/var/lib/sparkd-provision/state.json"))
-    state = StateStore(state_path)
+    identity = DeviceIdentity.simulated() if args.mock else DeviceIdentity.hardware()
+    state = StateStore(state_path, ap_ssid=f"DGX-Spark-{identity.last4}")
     if (args.reset_gpio_chip is None) != (args.reset_gpio_line is None):
         parser.error("--reset-gpio-chip and --reset-gpio-line must be provided together")
 
@@ -46,7 +48,7 @@ def main() -> None:
                 # Wi-Fi provisioning remains usable if Avahi is not installed; status
                 # is still available through the AP and direct LAN IP.
                 mdns = None
-        handlers = Handlers(driver, state, mdns)
+        handlers = Handlers(driver, state, mdns, serial=identity.serial, model=identity.model)
         app = create_app(handlers)
         if args.reset_gpio_chip is not None:
             button = GpiodResetButton.create(

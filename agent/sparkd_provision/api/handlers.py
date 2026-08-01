@@ -19,12 +19,20 @@ class Handlers:
     """The one transport-independent implementation of provisioning operations."""
 
     def __init__(
-        self, driver: NetDriver, state: StateStore | None = None, mdns: MdnsPublisher | None = None
+        self,
+        driver: NetDriver,
+        state: StateStore | None = None,
+        mdns: MdnsPublisher | None = None,
+        serial: str = "SIM-0001",
+        model: str = "DGX Spark (sim)",
     ) -> None:
         self.driver = driver
         self.state = state or StateStore()
         self.mdns = mdns
-        self.serial = "SIM-0001"
+        self.serial = serial
+        self.model = model
+        suffix = "".join(character for character in serial if character.isalnum())[-4:].lower()
+        self.hostname = f"dgx-spark-{suffix or '0001'}"
         self.device_private, self.device_public = generate_keypair()
         self.sid: str | None = None
         self.session_key: bytes | None = None
@@ -42,7 +50,7 @@ class Handlers:
         if not isinstance(body, dict):
             return error(message_id, "BAD_REQUEST")
         if op == "device.info":
-            return response(message_id, {"serial": self.serial, "model": "DGX Spark (sim)", "fw": "0.1.0", "state": "PROVISIONED" if self.state.state.claimed else "ADVERTISING", "capabilities": {"concurrent_ap_sta": self.driver.supports_concurrent_ap_sta}, "pubkey": self.device_public})
+            return response(message_id, {"serial": self.serial, "model": self.model, "fw": "0.1.0", "state": "PROVISIONED" if self.state.state.claimed else "ADVERTISING", "capabilities": {"concurrent_ap_sta": self.driver.supports_concurrent_ap_sta}, "pubkey": self.device_public})
         if op == "session.open":
             injected = getattr(self.driver, "failure", "")
             if injected == "session_busy":
@@ -109,8 +117,8 @@ class Handlers:
                 # This is deliberately delivered while the AP still exists.  The
                 # token is an opaque correlation value, not an owner credential.
                 handoff = {
-                    "mdns_name": "dgx-spark-0001.local",
-                    "expected_hostname": "dgx-spark-0001",
+                    "mdns_name": f"{self.hostname}.local",
+                    "expected_hostname": self.hostname,
                     "claim_token": secrets.token_urlsafe(24),
                 }
                 await self.driver.softap_down()
@@ -124,7 +132,7 @@ class Handlers:
                 # Avahi owns conflict handling; a failed publisher must not make a
                 # successfully provisioned device appear to have failed Wi-Fi.
                 try:
-                    await self.mdns.publish("DGX Spark", "dgx-spark-0001.local")
+                    await self.mdns.publish("DGX Spark", f"{self.hostname}.local")
                 except RuntimeError:
                     pass
             if status.phase == "failed":

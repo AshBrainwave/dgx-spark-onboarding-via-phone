@@ -2,7 +2,7 @@
 
 **Overall:** in_progress
 **Current step:** Part A2 — blocked on non-interactive privilege for NetworkManager/system installation
-**Updated:** 2026-08-01T23:23:16Z
+**Updated:** 2026-08-01T23:28:50Z
 
 ## Verification matrix
 
@@ -21,6 +21,7 @@
 - [ ] 8. Hardware networking (`v0.4-hw`)
 
 ## Done since last update
+- Fixed simulator identity leaking into hardware before A2: hardware mode now derives identity from `SPARK_SERIAL`, platform serial files, or hostname; `spark-0268` therefore drives AP name `DGX-Spark-0268`, BLE suffix `0268`, and mDNS name `dgx-spark-0268.local`, including after reset. Mac lint and all 17 tests pass.
 - Verified A4 normalization on the Spark at `456d963`: lint and all 16 tests pass on aarch64; 33 entries normalize to 16 unique named SSIDs plus 17 hidden BSSIDs; `Droid` correctly aggregates 2.4/5/6 GHz and reports WPA3-SAE; 802.1X is explicitly unsupported. Forced scan and raw-dBm accuracy remain unverified.
 - A4 read-only hardware comparison found that the original D-Bus scan emitted duplicate BSSIDs, lost hidden BSSIDs and multi-band information, mislabeled 6 GHz/WPA3/802.1X, and treated NetworkManager quality percent as dBm. Fixed scan normalization using the real Spark flag/frequency shapes, added WPA3 SAE connection selection, and added regression coverage; Mac lint and all 16 tests pass.
 - Fixed hardware deployment defects found before A2: the package now installs a real `sparkd-provision` CLI; `first-boot.sh` discovers and validates the NetworkManager Wi-Fi interface instead of assuming `wlan0`; the isolated production venv includes GPIO support; and systemd uses the detected interface plus captive-portal port 80. The installer enables but does not start the service. Mac lint and all 15 tests pass.
@@ -66,6 +67,7 @@
 - The physical reset implementation needs the Spark carrier-board GPIO chip/line and an actual button press for validation. Real BlueZ advertising/GATT, AP recovery, Avahi publishing, and mutating D-Bus networking validation remain unrun.
 
 ## Decisions I made that the spec didn't cover
+- The Spark exposes model `NVIDIA_DGX_Spark` but no readable DMI/device-tree serial. Hardware identity therefore falls back to hostname `spark-0268` unless `SPARK_SERIAL` is supplied by the image; this preserves the observed chassis suffix without inventing a serial.
 - Preserved the protocol's `rssi` field by converting NetworkManager quality percent to an explicitly documented estimate (`quality / 2 - 100`) rather than continuing to mislabel `quality - 100` as real dBm. This remains a known spec gap pending raw NL80211 data.
 - Used the complete `iw phy` output for the A1 gate because the hardware plan's suggested `sed` range stops after the first combination and hides the second, AP-capable combination.
 - The simulator starts with HTTP on `localhost:8080`; production SoftAP uses NetworkManager shared mode when hardware mode is selected.

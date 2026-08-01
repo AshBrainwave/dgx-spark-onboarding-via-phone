@@ -26,10 +26,13 @@ class DeviceState:
 
 
 class StateStore:
-    def __init__(self, path: Path | None = None) -> None:
+    def __init__(self, path: Path | None = None, ap_ssid: str = "DGX-Spark-0001") -> None:
         self.path = path
+        self.ap_ssid = ap_ssid
         now = datetime.now(UTC).isoformat()
-        self.state = DeviceState(provision_opened_at=now, ap_psk=self._ap_password())
+        self.state = DeviceState(
+            provision_opened_at=now, ap_ssid=self.ap_ssid, ap_psk=self._ap_password()
+        )
         if path and path.exists():
             self.state = DeviceState(**json.loads(path.read_text()))
 
@@ -44,7 +47,9 @@ class StateStore:
 
     def reset(self) -> None:
         self.state = DeviceState(
-            provision_opened_at=datetime.now(UTC).isoformat(), ap_psk=self._ap_password()
+            provision_opened_at=datetime.now(UTC).isoformat(),
+            ap_ssid=self.ap_ssid,
+            ap_psk=self._ap_password(),
         )
         self.save()
 

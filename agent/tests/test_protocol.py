@@ -9,6 +9,7 @@ from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 
 from sparkd_provision.api.handlers import Handlers
 from sparkd_provision.ble_peripheral import BleProtocolBridge, _decode, _encode
+from sparkd_provision.config import DeviceIdentity
 from sparkd_provision.net import mock_driver
 from sparkd_provision.net.capabilities import supports_concurrent_ap_sta
 from sparkd_provision.net.mock_driver import MockDriver
@@ -275,6 +276,19 @@ def test_real_networkmanager_scan_shapes_are_normalized() -> None:
     assert enterprise.unsupported is True
     assert hidden.ssid == ""
     assert hidden.security == "wpa2-psk"
+
+
+def test_hardware_identity_drives_radio_and_handoff_names(tmp_path) -> None:
+    identity = DeviceIdentity(serial="spark-0268", model="NVIDIA DGX Spark")
+    state = StateStore(tmp_path / "state.json", ap_ssid=f"DGX-Spark-{identity.last4}")
+    handlers = Handlers(MockDriver(), state, serial=identity.serial, model=identity.model)
+
+    assert identity.last4 == "0268"
+    assert state.state.ap_ssid == "DGX-Spark-0268"
+    assert handlers.serial == "spark-0268"
+    assert handlers.hostname == "dgx-spark-0268"
+    state.reset()
+    assert state.state.ap_ssid == "DGX-Spark-0268"
 
 
 def test_captive_dns_answers_any_a_query_with_ap_address() -> None:
