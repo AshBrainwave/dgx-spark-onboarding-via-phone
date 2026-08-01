@@ -2,13 +2,13 @@
 
 **Overall:** in_progress
 **Current step:** Part A2 — blocked on non-interactive privilege for NetworkManager/system installation
-**Updated:** 2026-08-01T23:22:22Z
+**Updated:** 2026-08-01T23:23:16Z
 
 ## Verification matrix
 
 | Verified on hardware | Verified in simulation only | Deferred (no Android) |
 | --- | --- | --- |
-| Spark aarch64/Python 3.12 portability gate (14 tests and lint); A1 NetworkManager ownership and AP+STA capability parser; Wi-Fi/Bluetooth rfkill state; Mac CoreBluetooth permission/preflight (19 BLE advertisers). | Protocol crypto/framing, mock driver, portal probes/DNS, app FSM/screens/error routes, simulator, NetworkManager/SoftAP implementation beyond A1, BlueZ bridge, mDNS publisher, handoff recovery, lifecycle/reset logic, BLE central probe framing/codec self-test. | Chrome Web Bluetooth chooser, user-gesture handling, Location Services prompt, Chrome reconnect/service-cache behaviour, and Android SoftAP fallback/`.local` resolution. |
+| Spark aarch64/Python 3.12 portability gate; A1 NetworkManager ownership and AP+STA parser; Wi-Fi/Bluetooth rfkill state; A4 cached-airspace dedup/bands/6 GHz/security/hidden handling; Mac CoreBluetooth permission/preflight. | Protocol crypto/framing, mock driver, portal probes/DNS, app FSM/screens/error routes, simulator, NetworkManager/SoftAP implementation beyond A1/A4, BlueZ bridge, mDNS publisher, handoff recovery, lifecycle/reset logic, BLE central probe framing/codec self-test. | Chrome Web Bluetooth chooser, user-gesture handling, Location Services prompt, Chrome reconnect/service-cache behaviour, and Android SoftAP fallback/`.local` resolution. |
 
 ## Milestones
 - [x] 1. Repo skeleton + CI — clean-clone Python and browser test commands passed
@@ -21,6 +21,7 @@
 - [ ] 8. Hardware networking (`v0.4-hw`)
 
 ## Done since last update
+- Verified A4 normalization on the Spark at `456d963`: lint and all 16 tests pass on aarch64; 33 entries normalize to 16 unique named SSIDs plus 17 hidden BSSIDs; `Droid` correctly aggregates 2.4/5/6 GHz and reports WPA3-SAE; 802.1X is explicitly unsupported. Forced scan and raw-dBm accuracy remain unverified.
 - A4 read-only hardware comparison found that the original D-Bus scan emitted duplicate BSSIDs, lost hidden BSSIDs and multi-band information, mislabeled 6 GHz/WPA3/802.1X, and treated NetworkManager quality percent as dBm. Fixed scan normalization using the real Spark flag/frequency shapes, added WPA3 SAE connection selection, and added regression coverage; Mac lint and all 16 tests pass.
 - Fixed hardware deployment defects found before A2: the package now installs a real `sparkd-provision` CLI; `first-boot.sh` discovers and validates the NetworkManager Wi-Fi interface instead of assuming `wlan0`; the isolated production venv includes GPIO support; and systemd uses the detected interface plus captive-portal port 80. The installer enables but does not start the service. Mac lint and all 15 tests pass.
 - A1 hardware survey: NetworkManager owns connected `wlP9s9`; Wi-Fi and Bluetooth are enabled/unblocked; BlueZ is powered and supports peripheral role with 16 advertising instances; NetworkManager, Bluetooth, systemd-resolved, and Avahi are active/enabled.
