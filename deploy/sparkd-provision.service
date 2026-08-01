@@ -6,9 +6,10 @@ Wants=NetworkManager.service
 [Service]
 Type=simple
 User=root
+EnvironmentFile=/etc/default/sparkd-provision
 # Set the two reset arguments in a systemd drop-in after confirming the carrier-board
 # wiring, for example: --reset-gpio-chip /dev/gpiochip0 --reset-gpio-line 23
-ExecStart=/usr/bin/sparkd-provision --interface wlan0
+ExecStart=/opt/dgx-spark-onboarding/venv/bin/sparkd-provision --interface ${SPARK_WIFI_INTERFACE} --port 80
 Restart=on-failure
 RestartSec=3
 StateDirectory=sparkd-provision

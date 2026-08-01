@@ -2,7 +2,7 @@
 
 **Overall:** in_progress
 **Current step:** Part A2 — blocked on non-interactive privilege for NetworkManager/system installation
-**Updated:** 2026-08-01T23:08:14Z
+**Updated:** 2026-08-01T23:13:46Z
 
 ## Verification matrix
 
@@ -21,6 +21,7 @@
 - [ ] 8. Hardware networking (`v0.4-hw`)
 
 ## Done since last update
+- Fixed hardware deployment defects found before A2: the package now installs a real `sparkd-provision` CLI; `first-boot.sh` discovers and validates the NetworkManager Wi-Fi interface instead of assuming `wlan0`; the isolated production venv includes GPIO support; and systemd uses the detected interface plus captive-portal port 80. The installer enables but does not start the service. Mac lint and all 15 tests pass.
 - A1 hardware survey: NetworkManager owns connected `wlP9s9`; Wi-Fi and Bluetooth are enabled/unblocked; BlueZ is powered and supports peripheral role with 16 advertising instances; NetworkManager, Bluetooth, systemd-resolved, and Avahi are active/enabled.
 - A1 AP+STA gate: the real wiphy advertises `#{ managed, P2P-client } <= 2, #{ AP } <= 1, #{ P2P-device } <= 1, total <= 3, #channels <= 1`. The production D-Bus driver selected `wlP9s9` and correctly reported `supports_concurrent_ap_sta=True`.
 - A1 port survey: systemd-resolved listens only on loopback port 53; libvirt listens on `192.168.122.1:53`; ports 80/8080 are free. Binding DNS to a future AP address remains to be validated after AP activation.

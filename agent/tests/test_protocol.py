@@ -200,6 +200,18 @@ def test_shared_crypto_vectors_match_protocol_ciphertext() -> None:
         )
 
 
+def test_hardware_installer_uses_detected_interface_and_port_80() -> None:
+    root = Path(__file__).parents[2]
+    service = (root / "deploy/sparkd-provision.service").read_text()
+    installer = (root / "scripts/first-boot.sh").read_text()
+
+    assert "--interface ${SPARK_WIFI_INTERFACE} --port 80" in service
+    assert "/opt/dgx-spark-onboarding/venv/bin/sparkd-provision" in service
+    assert "wlan0" not in service
+    assert "nmcli -t -f DEVICE,TYPE device status" in installer
+    assert "agent[hardware]" in installer
+
+
 def test_captive_dns_answers_any_a_query_with_ap_address() -> None:
     query = (
         struct.pack("!HHHHHH", 123, 0x0100, 1, 0, 0, 0)
@@ -227,11 +239,27 @@ async def test_non_concurrent_connect_sends_handoff_before_dropping_ap(monkeypat
     driver = MockDriver()
     handlers = Handlers(driver)
     _, public = generate_keypair()
-    opened = await handlers.handle({"v": 1, "id": "open", "op": "session.open", "sid": None, "body": {"client_pubkey": public, "nonce": b64url(b"n" * 16)}})
+    opened = await handlers.handle(
+        {
+            "v": 1,
+            "id": "open",
+            "op": "session.open",
+            "sid": None,
+            "body": {"client_pubkey": public, "nonce": b64url(b"n" * 16)},
+        }
+    )
     # Invalid cipher material is not the subject of this handoff test; use the
     # session key directly to produce an otherwise real connect envelope.
     encrypted = encrypt_psk(handlers.session_key, 1, "Home", "password")
-    result = await handlers.handle({"v": 1, "id": "connect", "op": "wifi.connect", "sid": opened["body"]["sid"], "body": {"ssid": "Home", "psk_enc": encrypted}})
+    result = await handlers.handle(
+        {
+            "v": 1,
+            "id": "connect",
+            "op": "wifi.connect",
+            "sid": opened["body"]["sid"],
+            "body": {"ssid": "Home", "psk_enc": encrypted},
+        }
+    )
     assert result["body"]["handoff"]["mdns_name"] == "dgx-spark-0001.local"
     assert result["body"]["handoff"]["claim_token"]
     assert driver.ap_down_calls == 1
