@@ -1,11 +1,13 @@
 import json
 import random
+import struct
 from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 
 from sparkd_provision.api.handlers import Handlers
 from sparkd_provision.net.mock_driver import MockDriver
+from sparkd_provision.portal.dns import answer_a_query
 from sparkd_provision.protocol.crypto import (
     b64url,
     decrypt_psk,
@@ -111,3 +113,10 @@ def test_shared_crypto_vectors_match_protocol_ciphertext() -> None:
         private = X25519PrivateKey.from_private_bytes(unb64url(vector["client_private"]))
         key = derive_key(private, vector["device_public"], vector["client_nonce"], vector["device_nonce"])
         assert encrypt_psk(key, vector["counter"], vector["ssid"], vector["psk"]) == vector["ciphertext"]
+
+
+def test_captive_dns_answers_any_a_query_with_ap_address() -> None:
+    query = struct.pack("!HHHHHH", 123, 0x0100, 1, 0, 0, 0) + b"\x07example\x03com\x00" + struct.pack("!HH", 1, 1)
+    response = answer_a_query(query, b"\xc0\x00\x02\x01")
+    assert response is not None
+    assert response[-4:] == b"\xc0\x00\x02\x01"
