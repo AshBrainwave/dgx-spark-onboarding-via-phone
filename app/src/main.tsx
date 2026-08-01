@@ -1,0 +1,15 @@
+import { useEffect, useState } from "react";
+import { createRoot } from "react-dom/client";
+import { Client } from "./protocol/client";
+import { HttpTransport } from "./transport/http";
+import type { Network } from "./protocol/messages";
+import "./style.css";
+
+const client = new Client(new HttpTransport());
+function App() {
+  const [step, setStep] = useState("welcome"); const [networks, setNetworks] = useState<Network[]>([]); const [selected, setSelected] = useState<Network | null>(null); const [password, setPassword] = useState(""); const [message, setMessage] = useState("");
+  async function start() { setStep("connecting"); try { await client.open(); const body = await client.call("wifi.scan", { force: false }); setNetworks(body.networks as Network[]); setStep("networks"); } catch { setMessage("Could not reach the Spark simulator."); setStep("error"); } }
+  async function connect() { if (!selected) return; await client.call("wifi.connect", { ssid: selected.ssid, security: selected.security, psk_enc: password, hidden: false }); setStep("applying"); }
+  useEffect(() => { if (step !== "applying") return; const timer = setInterval(async () => { const body = await client.call("wifi.status"); const phase = String(body.phase); setMessage(`${phase.replaceAll("_", " ")} ${body.ssid ?? ""}`); if (phase === "online") { clearInterval(timer); setStep("success"); } if (phase === "failed") { clearInterval(timer); setMessage(String(body.err)); setStep("error"); } }, 500); return () => clearInterval(timer); }, [step]);
+  return <main><h1>Set up your DGX Spark</h1>{step === "welcome" && <><p>Scan the chassis QR code, then connect your Spark to Wi-Fi.</p><button onClick={start}>Scan the QR code</button><p className="muted">Simulator: continue with the mock QR session.</p></>}{step === "connecting" && <p>Connecting securely to your Spark…</p>}{step === "networks" && <><h2>Choose network</h2>{networks.map(n => <button className="network" disabled={n.unsupported} key={n.ssid} onClick={() => { setSelected(n); setStep("password"); }}>{n.ssid} · {n.bars}/4 bars · {n.band}{n.unsupported ? ` — ${n.reason}` : ""}</button>)}<button onClick={start}>Refresh</button></>}{step === "password" && <><h2>{selected?.ssid}</h2><input aria-label="Wi-Fi password" autoComplete="current-password" autoCapitalize="none" autoCorrect="off" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Wi-Fi password"/><p className="muted">WPA2 passwords are 8–63 characters.</p><button onClick={connect}>Send credentials</button></>}{step === "applying" && <><h2>Connecting your Spark</h2><p>{message || "Sending credentials…"}</p></>}{step === "success" && <><h2>Spark is online</h2><p>192.168.1.44 · dgx-spark-sim.local</p><p>Next: open the Spark web UI or copy an SSH command.</p></>}{step === "error" && <><h2>Setup needs attention</h2><p>{message}</p><button onClick={() => setStep("networks")}>Choose another network</button></>}</main> }
+createRoot(document.getElementById("root")!).render(<App />);
