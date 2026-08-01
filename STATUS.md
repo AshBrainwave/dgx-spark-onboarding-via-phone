@@ -18,7 +18,8 @@
 - Initial README check-in (`f3c54e8`)
 - Added skeleton, documentation, Apache-2.0 license, and CI (`fa6de1b`)
 - Added transport-agnostic mock HTTP agent and framing test coverage (`b9df34a`)
-- Added simulator enrollment QR PNG and terminal rendering (pending commit)
+- Added simulator enrollment QR PNG and terminal rendering (`f551850`)
+- Added actionable simulator error copy (`e661660`)
 
 ## Blocked
 - GitHub push is blocked: `git push -u origin main` received HTTP 403 for `AshBrainwave`. Local commits continue normally.
