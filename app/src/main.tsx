@@ -4,6 +4,7 @@ import { Client, ProtocolError } from "./protocol/client";
 import type { Network } from "./protocol/messages";
 import { HttpTransport } from "./transport/http";
 import { BleTransport, shouldUseBle } from "./transport/ble";
+import { findSpark, transportForManualIp } from "./transport/lan";
 import { Applying } from "./screens/Applying";
 import { ChooseNetwork } from "./screens/ChooseNetwork";
 import { Connecting } from "./screens/Connecting";
@@ -34,7 +35,8 @@ function App() {
   const [error, setError] = useState<ErrorCode>(knownError(devError ?? "PORTAL_UNREACHABLE"));
   const [ip, setIp] = useState("");
   const [connectingTransport, setConnectingTransport] = useState<"BLE" | "portal">("portal");
-  const concurrent = params.get("concurrent") !== "0";
+  const [concurrent, setConcurrent] = useState(params.get("concurrent") !== "0");
+  const [mdnsName, setMdnsName] = useState("dgx-spark-0001.local");
   const selectedSsid = selected?.ssid ?? "Hidden network";
   const fail = (reason: unknown) => { setError(knownError(reason instanceof ProtocolError ? reason.code : "PORTAL_UNREACHABLE")); setScreen("error"); };
   const onQrParsed = () => {
@@ -56,6 +58,7 @@ function App() {
         client.setTransport(new HttpTransport());
       }
       const info = await client.call("device.info");
+      setConcurrent(Boolean((info.capabilities as { concurrent_ap_sta?: boolean }).concurrent_ap_sta));
       const qrPubkey = params.get("pubkey") ?? String(info.pubkey);
       await client.open(qrPubkey);
       await refresh();
@@ -75,7 +78,9 @@ function App() {
   }
   async function connect(password: string) {
     try {
-      await client.connectWifi(selectedSsid, selected?.security ?? "wpa2-psk", password, !selected);
+      const result = await client.connectWifi(selectedSsid, selected?.security ?? "wpa2-psk", password, !selected);
+      const handoff = result.handoff as { mdns_name?: string } | null;
+      if (handoff?.mdns_name) setMdnsName(handoff.mdns_name);
       setElapsed(0);
       setScreen("applying");
     } catch (reason) {
@@ -83,7 +88,30 @@ function App() {
     }
   }
   useEffect(() => { if (screen !== "applying") return; const started = Date.now(); const timer = setInterval(async () => { setElapsed(Math.floor((Date.now() - started) / 1000)); try { const status = await client.call("wifi.status"); setPhase(String(status.phase)); if (status.phase === "online") { setIp(String(status.ip)); setScreen(concurrent ? "success" : "reconnect"); } if (status.phase === "failed") fail(new ProtocolError(String(status.err), "Wi-Fi failed")); } catch (reason) { fail(reason); } }, 500); return () => clearInterval(timer); }, [screen, concurrent]);
-  useEffect(() => { if (screen !== "reconnect") return; const timer = setTimeout(() => setScreen("success"), 5000); return () => clearTimeout(timer); }, [screen]);
+  useEffect(() => {
+    if (screen !== "reconnect") return;
+    let cancelled = false;
+    void findSpark(mdnsName).then(async transport => {
+      if (!transport || cancelled) return;
+      client.setTransport(transport);
+      const status = await client.call("wifi.status");
+      if (!cancelled && status.phase === "online") {
+        setIp(String(status.ip));
+        setScreen("success");
+      }
+    }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [screen, mdnsName]);
+  async function useManualIp(value: string) {
+    try {
+      client.setTransport(transportForManualIp(value));
+      const status = await client.call("wifi.status");
+      setIp(String(status.ip));
+      setScreen("success");
+    } catch (reason) {
+      fail(reason);
+    }
+  }
   const route = devScreen ?? screen;
   const demoNetworks: Network[] = [{ ssid: "Home Wi-Fi", rssi: -40, bars: 4, security: "wpa2-psk", band: "2.4ghz" }];
   const content = useMemo(() => {
@@ -95,7 +123,7 @@ function App() {
       case "networks": return <ChooseNetwork networks={networks.length ? networks : demoNetworks} scannedAt={scannedAt} onChoose={n => { setSelected(n); setScreen("password"); }} onRefresh={refresh} onOther={() => { setSelected(null); setScreen("password"); }} />;
       case "password": return <Password ssid={selectedSsid} onSubmit={connect} />;
       case "applying": return <Applying phase={phase} elapsed={elapsed} />;
-      case "reconnect": return <Reconnect ssid={selectedSsid} seconds={20} />;
+      case "reconnect": return <Reconnect ssid={selectedSsid} seconds={20} onManualIp={useManualIp} />;
       case "success": return <Success ip={ip || "192.168.1.44"} hostname="dgx-spark-sim" onName={async name => { try { await client.call("device.rename", { name }); } catch { /* Naming is optional after success. */ } }} />;
       case "error": return <ErrorScreen code={error} ssid={selected?.ssid} onBack={() => {
         const target = errorCopy[error].target;

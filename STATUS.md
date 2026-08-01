@@ -37,6 +37,7 @@
 - Added durable provisioning lifecycle state, first-boot systemd assets, claim/window/backoff enforcement, real NetworkManager IPv4 status extraction, and a browser Web Bluetooth GATT transport. Python lint/tests (9 passed), browser typecheck/tests (8 passed), and build passed (`1b1192d`).
 - Added an Avahi D-Bus publisher for `_dgx-spark._tcp.local` after an online status; lint, Python tests (9 passed), browser typecheck, and browser tests (8 passed) (`ae4b6a0`).
 - Added a BlueZ D-Bus GATT peripheral with advertised 128-bit service UUID, RX/TX/INFO characteristics, real gzip/base64url protocol bridge, ten-second reassembly NAKs, and radio-free bridge coverage. Added kernel wiphy AP+STA capability parsing plus non-concurrent handoff metadata and independent 20-second SoftAP recovery. Python lint/tests (13 passed), browser typecheck/tests (8 passed), and build passed (pending commit).
+- Added phone-side post-handoff discovery: mDNS first, bounded private-LAN candidate sweep for Android Chrome, and a manual LAN-IP fallback. Browser typecheck/tests (8 passed) and production build passed (pending commit).
 
 ## Blocked
 - Nothing blocks simulator work.
@@ -51,5 +52,5 @@
 ## Next
 - Validate the BlueZ GATT peripheral with Android Chrome and the real Spark: service UUID must appear in the chooser advertisement, CTRL RX/TX must exchange fragmented encrypted envelopes, INFO must read, and disconnect must retry once (Priority 6).
 - Complete and validate hardware networking: exercise NetworkManager scan/join/AP, captive DNS/probes on the actual AP address, Avahi publication, and map observed NM state reasons to the full error taxonomy (Priority 7).
-- Finish the phone-side non-concurrent recovery client: mDNS status polling, Android gateway-subnet candidate-IP sweep, and manual-IP fallback; then validate AP restoration within 20 seconds after each failure on a supported radio (Priority 8).
+- Validate the non-concurrent recovery client on hardware: mDNS status polling, Android candidate-IP sweep/manual-IP fallback, and AP restoration within 20 seconds after every join failure (Priority 8).
 - Implement physical-reset GPIO integration and validate systemd first-boot/state recovery/claim-lock/rate-limit behavior on the Spark (Priority 9).

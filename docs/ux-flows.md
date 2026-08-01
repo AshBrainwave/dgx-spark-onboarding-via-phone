@@ -18,6 +18,12 @@ development route.
 Errors return only to the relevant list, password, join, retry, or manual-IP action; they
 never silently restart QR scanning. `PUBKEY_MISMATCH` is the only hard abort.
 
+During a non-concurrent handoff, the phone first probes the supplied Bonjour name, then
+checks the common private gateway ranges (`192.168.0.x`, `192.168.1.x`, and `10.0.0.x`) in
+parallel with short timeouts. This compensates for Android Chrome's unreliable `.local`
+resolution. A manual LAN-IP field remains visible because web applications cannot obtain the
+phone's gateway subnet from the browser network APIs.
+
 For review without hardware, use `?screen=error&error=<CODE>` for any listed protocol error,
 for example `?screen=error&error=WIFI_AUTH_FAILED`. `SPARK_SIM_FAIL` accepts the same
 uppercase code (and the documented short aliases) so each screen can also be reached through
