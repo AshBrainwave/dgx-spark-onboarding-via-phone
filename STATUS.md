@@ -1,8 +1,8 @@
 # DGX Spark Onboarding — Build Status
 
 **Overall:** in_progress
-**Current step:** 7 — BLE hardware validation is blocked; browser transport and device lifecycle implementation added
-**Updated:** 2026-08-01T21:56:00Z
+**Current step:** 7–8 — BlueZ peripheral and non-concurrent handoff recovery are implemented; hardware validation is blocked
+**Updated:** 2026-08-01T22:02:00Z
 
 ## Milestones
 - [x] 1. Repo skeleton + CI — clean-clone Python and browser test commands passed
@@ -36,20 +36,20 @@
 - Added the production NetworkManager D-Bus driver (`dbus-fast`), including startup ownership detection, access-point scan, WPA2 profile activation, and a 2.4 GHz shared SoftAP profile. Lint, 9 Python tests, 8 browser tests, and TypeScript typecheck passed (`8d001f5`).
 - Added durable provisioning lifecycle state, first-boot systemd assets, claim/window/backoff enforcement, real NetworkManager IPv4 status extraction, and a browser Web Bluetooth GATT transport. Python lint/tests (9 passed), browser typecheck/tests (8 passed), and build passed (`1b1192d`).
 - Added an Avahi D-Bus publisher for `_dgx-spark._tcp.local` after an online status; lint, Python tests (9 passed), browser typecheck, and browser tests (8 passed) (`ae4b6a0`).
+- Added a BlueZ D-Bus GATT peripheral with advertised 128-bit service UUID, RX/TX/INFO characteristics, real gzip/base64url protocol bridge, ten-second reassembly NAKs, and radio-free bridge coverage. Added kernel wiphy AP+STA capability parsing plus non-concurrent handoff metadata and independent 20-second SoftAP recovery. Python lint/tests (13 passed), browser typecheck/tests (8 passed), and build passed (pending commit).
 
 ## Blocked
 - Nothing blocks simulator work.
 - BLE validation requires the real Spark, a BlueZ-capable Linux Bluetooth adapter, and an Android phone. This workspace's `bluetoothctl show` fails with `Unable to open mgmt_socket`; no usable adapter is present.
 - Hardware-networking validation requires the Spark, NetworkManager, and a supported Wi-Fi radio. None is available in this workspace, so D-Bus activation, SoftAP, DNS, mDNS, and handoff behavior cannot yet be run.
-- The physical-reset GPIO wiring, BlueZ GATT peripheral, Avahi publisher, runtime AP+STA capability detection, and handoff/recovery path are not yet implemented. They need a Spark-specific hardware interface and cannot be responsibly guessed from this radio-less host.
+- Physical-reset GPIO wiring is not implemented because the Spark-specific GPIO interface has not been supplied. Real BlueZ advertising/GATT, NetworkManager AP+STA capability discovery, AP recovery, Avahi, and D-Bus networking validation remain blocked by this host's lack of Bluetooth and Wi-Fi hardware.
 
 ## Decisions I made that the spec didn't cover
 - The simulator starts with HTTP on `localhost:8080`; production SoftAP uses NetworkManager shared mode when hardware mode is selected.
 - The simulator accepts both documented uppercase `SPARK_SIM_FAIL` error codes and concise aliases. `WIFI_NO_INTERNET` proceeds to LAN-only success by design.
 
 ## Next
-- Implement the actual Web Bluetooth GATT transport (request-device gesture, advertised service filter, characteristics, gzip/base64url framing, reconnect) and BLE peripheral, then validate against Android Chrome and the real Spark (Priority 6). The radio-free framing loopback is already tested.
-- Implement the Linux BlueZ GATT peripheral (advertisement UUID/name, CTRL RX/TX/INFO, ten-second NAK handling) and validate it with Android Chrome and the real Spark (Priority 6). The browser transport is implemented; validation remains blocked by hardware.
-- Complete and unit-test the NetworkManager driver: map NM state reasons to the full Wi-Fi taxonomy, add Avahi mDNS, connect DNS/captive behavior to the AP address, and validate profile persistence/status on a supported radio (Priority 7).
-- Implement runtime wiphy AP+STA detection, non-concurrent handoff/recovery within 20 seconds, mDNS/IP-sweep client reconnection, and test on hardware (Priority 8).
-- Implement the physical-reset GPIO integration and validate systemd first-boot/state recovery/claim-lock/rate-limit behavior on the Spark (Priority 9).
+- Validate the BlueZ GATT peripheral with Android Chrome and the real Spark: service UUID must appear in the chooser advertisement, CTRL RX/TX must exchange fragmented encrypted envelopes, INFO must read, and disconnect must retry once (Priority 6).
+- Complete and validate hardware networking: exercise NetworkManager scan/join/AP, captive DNS/probes on the actual AP address, Avahi publication, and map observed NM state reasons to the full error taxonomy (Priority 7).
+- Finish the phone-side non-concurrent recovery client: mDNS status polling, Android gateway-subnet candidate-IP sweep, and manual-IP fallback; then validate AP restoration within 20 seconds after each failure on a supported radio (Priority 8).
+- Implement physical-reset GPIO integration and validate systemd first-boot/state recovery/claim-lock/rate-limit behavior on the Spark (Priority 9).

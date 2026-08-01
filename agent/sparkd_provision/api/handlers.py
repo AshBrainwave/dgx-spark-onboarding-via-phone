@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 import secrets
 from datetime import UTC, datetime
@@ -31,6 +32,7 @@ class Handlers:
         self.session_opened_at: datetime | None = None
         self.connect_attempts = 0
         self.next_connect_at: datetime | None = None
+        self._handoff_task: asyncio.Task[None] | None = None
 
     async def handle(self, request: dict[str, Any]) -> dict[str, Any]:
         message_id = request.get("id", "")
@@ -102,8 +104,20 @@ class Handlers:
             # 1, 2, 4, 8, 16 seconds following attempts; the first stays immediate.
             from datetime import timedelta
             self.next_connect_at = now + timedelta(seconds=max(0, 2 ** (self.connect_attempts - 1) - 1))
+            handoff: dict[str, str] = {}
+            if not self.driver.supports_concurrent_ap_sta:
+                # This is deliberately delivered while the AP still exists.  The
+                # token is an opaque correlation value, not an owner credential.
+                handoff = {
+                    "mdns_name": "dgx-spark-0001.local",
+                    "expected_hostname": "dgx-spark-0001",
+                    "claim_token": secrets.token_urlsafe(24),
+                }
+                await self.driver.softap_down()
             await self.driver.connect(ssid, psk, body.get("security", "wpa2-psk"), bool(body.get("hidden")))
-            return response(message_id, {"accepted": True})
+            if handoff:
+                self._handoff_task = asyncio.create_task(self._recover_ap_after_failed_handoff())
+            return response(message_id, {"accepted": True, "handoff": handoff or None})
         if op == "wifi.status":
             status = await self.driver.status()
             if status.phase == "online" and self.mdns:
@@ -145,3 +159,19 @@ class Handlers:
         self.session_opened_at = None
         self.connect_attempts = 0
         self.next_connect_at = None
+
+    async def _recover_ap_after_failed_handoff(self) -> None:
+        """Restore the only recovery path if a non-concurrent join fails.
+
+        This runs independently of a phone polling a now-disconnected portal.
+        NetworkManager normally reaches a terminal failure quickly; the 20-second
+        deadline is the UX contract and a later failure is still recovered.
+        """
+        for _ in range(20):
+            await asyncio.sleep(1)
+            status = await self.driver.status()
+            if status.phase == "online":
+                return
+            if status.phase == "failed":
+                await self.driver.softap_up(self.state.state.ap_ssid, self.state.state.ap_psk)
+                return

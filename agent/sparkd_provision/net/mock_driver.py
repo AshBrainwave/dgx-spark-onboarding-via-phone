@@ -16,6 +16,8 @@ class MockDriver(NetDriver):
         self.failure = self.raw_failure.lower()
         self._status = LinkStatus()
         self._concurrent = os.getenv("SPARK_SIM_CONCURRENT_AP_STA", "1") == "1"
+        self.ap_up_calls = 0
+        self.ap_down_calls = 0
         self.networks = [
             Network("Malegaonkar-5G", "aa:bb:cc:dd:ee:01", -35, 4, "wpa2-psk", "5ghz", bands=["2.4ghz", "5ghz"]),
             Network("DGX Lab Guest", "aa:bb:cc:dd:ee:02", -51, 4, "open", "2.4ghz"),
@@ -74,5 +76,8 @@ class MockDriver(NetDriver):
     async def forget(self) -> None:
         self._status = LinkStatus()
 
-    async def softap_up(self, ssid: str, psk: str) -> None: pass
-    async def softap_down(self) -> None: pass
+    async def softap_up(self, ssid: str, psk: str) -> None:
+        self.ap_up_calls += 1
+
+    async def softap_down(self) -> None:
+        self.ap_down_calls += 1

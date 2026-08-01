@@ -34,3 +34,11 @@ the service UUID in the advertising service-UUID list and advertise as `DGX Spar
 
 Incomplete frames are dropped after ten seconds. The receiver should NAK the message ID;
 the browser request also times out at ten seconds so it never hangs indefinitely.
+
+On Linux, `sparkd_provision.ble_peripheral.BluezPeripheral` exports this exact profile via
+BlueZ system D-Bus.  `CTRL_RX` schedules protocol handling after write-without-response,
+`CTRL_TX` publishes every response frame as a notifying `Value`, and `INFO` returns the
+unencrypted serial/public-key snapshot.  The `LEAdvertisement1.ServiceUUIDs` property
+contains the base UUID and its `LocalName` is `DGX Spark <last4>`; both are essential for
+Chrome's service-filtered chooser.  Its radio-free bridge test verifies the actual
+gzip/base64url envelope and frame reassembly before hardware validation.

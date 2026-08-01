@@ -14,6 +14,10 @@
   failures, reconnect once on `gattserverdisconnected`, and warn developers that Chrome may
   cache a restarted GATT table.
 
+Hardware mode starts the BlueZ peripheral on `/org/bluez/hci0` by default; deployers can
+select another adapter with `--bluetooth-adapter`. `--no-ble` is an intentional diagnostic
+escape hatch for a networking-only appliance image, not the normal provisioning path.
+
 ## NetworkManager ownership
 
 Hardware mode uses NetworkManager's system D-Bus API through `dbus-fast`, never parsed
@@ -33,3 +37,13 @@ After Wi-Fi is online, hardware mode attempts to publish `DGX Spark` as
 `_dgx-spark._tcp.local` through Avahi, with hostname `dgx-spark-0001.local` and portal port
 8080. An unavailable Avahi daemon does not invalidate a completed Wi-Fi join: direct LAN-IP
 status remains available and the missing advertisement is a deployment fault to surface.
+
+## AP-to-STA capability detection
+
+Before joining a home network the agent reads the kernel NL80211 wiphy's *valid interface
+combinations* through read-only `iw phy` output.  Only a combination that independently
+permits managed and AP interfaces with `total <= 2` (or higher) is concurrent AP+STA.  The
+agent does not infer this from a chipset name.  On a non-concurrent radio it gives the phone
+an mDNS name, hostname, and opaque handoff correlation token while the AP is still live,
+then drops the AP and monitors the join independently.  A failed join brings the persisted
+SoftAP back within twenty seconds.

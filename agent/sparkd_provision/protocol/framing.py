@@ -33,7 +33,7 @@ class Reassembler:
         if version != 1:
             raise ValueError("unsupported frame version")
         now = time.monotonic()
-        self.pending = {key: value for key, value in self.pending.items() if now - value[0] < self.timeout}
+        self.expire(now)
         _, parts, last = self.pending.get(message_id, (now, {}, None))
         parts[seq] = frame[HEADER.size :]
         if flags & LAST:
@@ -43,3 +43,11 @@ class Reassembler:
             del self.pending[message_id]
             return message_id, b"".join(parts[index] for index in range(last + 1))
         return None
+
+    def expire(self, now: float | None = None) -> list[int]:
+        """Drop incomplete messages and return their IDs so a BLE peer can NAK."""
+        now = time.monotonic() if now is None else now
+        expired = [key for key, value in self.pending.items() if now - value[0] >= self.timeout]
+        for key in expired:
+            del self.pending[key]
+        return expired

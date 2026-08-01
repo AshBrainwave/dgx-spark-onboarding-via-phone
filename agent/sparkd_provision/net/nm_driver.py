@@ -6,12 +6,14 @@ The driver is instantiated only on hardware; the simulator continues to use Mock
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Iterable
 from typing import Any
 
 from dbus_fast import BusType, Message, MessageType, Variant
 from dbus_fast.aio import MessageBus
 
+from sparkd_provision.net.capabilities import supports_concurrent_ap_sta
 from sparkd_provision.net.driver import LinkStatus, NetDriver
 from sparkd_provision.protocol.messages import Network
 
@@ -61,7 +63,29 @@ class NetworkManagerDriver(NetDriver):
                 f"NetworkManager does not own a wireless device{wanted}. "
                 "Configure NetworkManager to manage the radio before starting sparkd-provision."
             )
+        driver._concurrent_ap_sta = await driver._detect_concurrent_ap_sta()
         return driver
+
+    async def _detect_concurrent_ap_sta(self) -> bool:
+        """Read NL80211's wiphy combinations without changing radio state."""
+        try:
+            process = await asyncio.create_subprocess_exec(
+                "iw", "dev", self.interface, "info", stdout=asyncio.subprocess.PIPE
+            )
+            info, _ = await process.communicate()
+            phy = next(
+                (line.split()[1] for line in info.decode().splitlines() if line.strip().startswith("wiphy ")),
+                None,
+            )
+            if phy is None:
+                return False
+            process = await asyncio.create_subprocess_exec(
+                "iw", "phy", f"phy{phy}", "info", stdout=asyncio.subprocess.PIPE
+            )
+            output, _ = await process.communicate()
+            return process.returncode == 0 and supports_concurrent_ap_sta(output.decode())
+        except (FileNotFoundError, OSError):
+            return False
 
     async def _call(
         self,

@@ -4,6 +4,7 @@ from pathlib import Path
 from aiohttp import web
 
 from sparkd_provision.api.handlers import Handlers
+from sparkd_provision.ble_peripheral import BluezPeripheral
 from sparkd_provision.net.mdns import MdnsPublisher
 from sparkd_provision.net.mock_driver import MockDriver
 from sparkd_provision.net.nm_driver import NetworkManagerDriver
@@ -17,6 +18,8 @@ def main() -> None:
     parser.add_argument("--interface", help="NetworkManager-owned Wi-Fi interface for hardware mode")
     parser.add_argument("--host", help="HTTP bind address (default: localhost for mock, all addresses for hardware)")
     parser.add_argument("--port", type=int, default=8080)
+    parser.add_argument("--bluetooth-adapter", default="/org/bluez/hci0")
+    parser.add_argument("--no-ble", action="store_true", help="Do not export the BlueZ provisioning GATT service")
     parser.add_argument("--state-path", type=Path, help="State file (default: /var/lib/sparkd-provision/state.json in hardware mode)")
     args = parser.parse_args()
     host = args.host or ("127.0.0.1" if args.mock else "0.0.0.0")
@@ -38,7 +41,14 @@ def main() -> None:
                 # Wi-Fi provisioning remains usable if Avahi is not installed; status
                 # is still available through the AP and direct LAN IP.
                 mdns = None
-        return create_app(Handlers(driver, state, mdns))
+        handlers = Handlers(driver, state, mdns)
+        app = create_app(handlers)
+        if not args.mock and not args.no_ble:
+            peripheral = await BluezPeripheral.create(handlers, args.bluetooth_adapter)
+            await peripheral.start()
+            # Keep the bus and exported D-Bus objects alive for aiohttp's life.
+            app["ble_peripheral"] = peripheral
+        return app
 
     web.run_app(runtime_app(), host=host, port=args.port)
 

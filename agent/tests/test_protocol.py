@@ -2,12 +2,15 @@ import asyncio
 import json
 import random
 import struct
+import time
 from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 
 from sparkd_provision.api.handlers import Handlers
+from sparkd_provision.ble_peripheral import BleProtocolBridge, _decode, _encode
 from sparkd_provision.net import mock_driver
+from sparkd_provision.net.capabilities import supports_concurrent_ap_sta
 from sparkd_provision.net.mock_driver import MockDriver
 from sparkd_provision.portal.dns import answer_a_query
 from sparkd_provision.protocol.crypto import (
@@ -149,6 +152,30 @@ def test_framing_fuzzes_sizes_order_and_drops() -> None:
                 assert reassembler.add(frame) is None
 
 
+def test_framing_expiry_reports_message_id() -> None:
+    reassembler = Reassembler()
+    reassembler.add(fragment(b"x" * 17, 77)[0])
+    assert reassembler.expire(time.monotonic() + 11) == [77]
+
+
+async def test_ble_bridge_decodes_handles_and_frames_response() -> None:
+    sent: list[bytes] = []
+
+    async def send(frame: bytes) -> None:
+        sent.append(frame)
+
+    bridge = BleProtocolBridge(Handlers(MockDriver()), send)
+    request = {"v": 1, "id": "info", "op": "device.info", "sid": None, "body": {}}
+    for frame in fragment(_encode(request), 9):
+        await bridge.receive(frame)
+    reassembler = Reassembler()
+    response = None
+    for frame in sent:
+        response = reassembler.add(frame) or response
+    assert response is not None
+    assert _decode(response[1])["body"]["serial"] == "SIM-0001"
+
+
 def test_shared_contract_fixtures_have_valid_envelopes() -> None:
     fixture_path = Path(__file__).parents[2] / "protocol" / "messages.json"
     for fixture in json.loads(fixture_path.read_text()):
@@ -181,3 +208,29 @@ def test_captive_dns_answers_any_a_query_with_ap_address() -> None:
     response = answer_a_query(query, b"\xc0\x00\x02\x01")
     assert response is not None
     assert response[-4:] == b"\xc0\x00\x02\x01"
+
+
+def test_wiphy_concurrent_ap_sta_parser_requires_two_interfaces() -> None:
+    assert supports_concurrent_ap_sta("""
+valid interface combinations:
+ * #{ managed } <= 1, #{ AP } <= 1, total <= 2, #channels <= 1
+""")
+    assert not supports_concurrent_ap_sta("""
+valid interface combinations:
+ * #{ managed, AP } <= 1, total <= 1, #channels <= 1
+""")
+
+
+async def test_non_concurrent_connect_sends_handoff_before_dropping_ap(monkeypatch) -> None:
+    monkeypatch.setenv("SPARK_SIM_CONCURRENT_AP_STA", "0")
+    driver = MockDriver()
+    handlers = Handlers(driver)
+    _, public = generate_keypair()
+    opened = await handlers.handle({"v": 1, "id": "open", "op": "session.open", "sid": None, "body": {"client_pubkey": public, "nonce": b64url(b"n" * 16)}})
+    # Invalid cipher material is not the subject of this handoff test; use the
+    # session key directly to produce an otherwise real connect envelope.
+    encrypted = encrypt_psk(handlers.session_key, 1, "Home", "password")
+    result = await handlers.handle({"v": 1, "id": "connect", "op": "wifi.connect", "sid": opened["body"]["sid"], "body": {"ssid": "Home", "psk_enc": encrypted}})
+    assert result["body"]["handoff"]["mdns_name"] == "dgx-spark-0001.local"
+    assert result["body"]["handoff"]["claim_token"]
+    assert driver.ap_down_calls == 1
