@@ -1,14 +1,14 @@
 # DGX Spark Onboarding — Build Status
 
 **Overall:** in_progress
-**Current step:** Part A1 — survey NetworkManager, AP+STA capability, Bluetooth, and port ownership
-**Updated:** 2026-08-01T23:04:33Z
+**Current step:** Part A2 — blocked on non-interactive privilege for NetworkManager/system installation
+**Updated:** 2026-08-01T23:08:14Z
 
 ## Verification matrix
 
 | Verified on hardware | Verified in simulation only | Deferred (no Android) |
 | --- | --- | --- |
-| Spark aarch64/Python 3.12 portability gate (14 tests and lint); Mac CoreBluetooth permission/preflight (19 BLE advertisers). The Spark itself is not yet advertising. | Protocol crypto/framing, mock driver, portal probes/DNS, app FSM/screens/error routes, simulator, NetworkManager/SoftAP implementation, BlueZ bridge, mDNS publisher, handoff recovery, lifecycle/reset logic, BLE central probe framing/codec self-test. | Chrome Web Bluetooth chooser, user-gesture handling, Location Services prompt, Chrome reconnect/service-cache behaviour, and Android SoftAP fallback/`.local` resolution. |
+| Spark aarch64/Python 3.12 portability gate (14 tests and lint); A1 NetworkManager ownership and AP+STA capability parser; Wi-Fi/Bluetooth rfkill state; Mac CoreBluetooth permission/preflight (19 BLE advertisers). | Protocol crypto/framing, mock driver, portal probes/DNS, app FSM/screens/error routes, simulator, NetworkManager/SoftAP implementation beyond A1, BlueZ bridge, mDNS publisher, handoff recovery, lifecycle/reset logic, BLE central probe framing/codec self-test. | Chrome Web Bluetooth chooser, user-gesture handling, Location Services prompt, Chrome reconnect/service-cache behaviour, and Android SoftAP fallback/`.local` resolution. |
 
 ## Milestones
 - [x] 1. Repo skeleton + CI — clean-clone Python and browser test commands passed
@@ -21,6 +21,9 @@
 - [ ] 8. Hardware networking (`v0.4-hw`)
 
 ## Done since last update
+- A1 hardware survey: NetworkManager owns connected `wlP9s9`; Wi-Fi and Bluetooth are enabled/unblocked; BlueZ is powered and supports peripheral role with 16 advertising instances; NetworkManager, Bluetooth, systemd-resolved, and Avahi are active/enabled.
+- A1 AP+STA gate: the real wiphy advertises `#{ managed, P2P-client } <= 2, #{ AP } <= 1, #{ P2P-device } <= 1, total <= 3, #channels <= 1`. The production D-Bus driver selected `wlP9s9` and correctly reported `supports_concurrent_ap_sta=True`.
+- A1 port survey: systemd-resolved listens only on loopback port 53; libvirt listens on `192.168.122.1:53`; ports 80/8080 are free. Binding DNS to a future AP address remains to be validated after AP activation.
 - Established non-interactive SSH to `nbutme@192.168.68.87`: `spark-0268`, Ubuntu 24.04.4 LTS, aarch64, kernel `6.17.0-1029-nvidia`.
 - Cloned pushed commit `76f39cb` onto the Spark over HTTPS, confirmed the authoritative spec SHA-256, installed `agent[dev]` into a repository-local Python 3.12.3 venv, and passed Spark-side lint plus all 14 tests.
 - Restored GitHub push access by switching this Mac checkout from the unauthorized HTTPS identity (`mash-falcon`) to the existing SSH identity (`AshBrainwave`); pushed `main` through `fdd05bf`.
@@ -53,16 +56,18 @@
 
 ## Blocked
 - Nothing blocks simulator work.
+- Hardware mutation is blocked for this orchestrated SSH session: `sudo -n true` requires a password, and `nmcli general permissions` reports `auth`/`no` for scan, network control, protected sharing, and connection modification. A2 cannot safely activate a SoftAP and systemd/BlueZ/GPIO assets cannot be installed until `nbutme` has non-interactive privilege for this pass.
 - Spark-side BLE advertising/GATT validation requires the agent to be deployed and advertising. The Mac side is ready and its CoreBluetooth permission is verified; no Android device is needed for Part C.
 - Hardware-networking D-Bus activation, SoftAP, DNS, mDNS, and handoff behavior remain unrun pending the A1 survey.
-- The physical reset implementation needs the Spark carrier-board GPIO chip/line and an actual button press for validation. Real BlueZ advertising/GATT, NetworkManager AP+STA capability discovery, AP recovery, Avahi, and D-Bus networking validation remain blocked by this host's lack of Bluetooth and Wi-Fi hardware.
+- The physical reset implementation needs the Spark carrier-board GPIO chip/line and an actual button press for validation. Real BlueZ advertising/GATT, AP recovery, Avahi publishing, and mutating D-Bus networking validation remain unrun.
 
 ## Decisions I made that the spec didn't cover
+- Used the complete `iw phy` output for the A1 gate because the hardware plan's suggested `sed` range stops after the first combination and hides the second, AP-capable combination.
 - The simulator starts with HTTP on `localhost:8080`; production SoftAP uses NetworkManager shared mode when hardware mode is selected.
 - The simulator accepts both documented uppercase `SPARK_SIM_FAIL` error codes and concise aliases. `WIFI_NO_INTERNET` proceeds to LAN-only success by design.
 
 ## Next
-- On the Spark: deploy the repository, install `agent[dev,hardware]`, run the Python suite, then record the A1 NetworkManager/Bluetooth/rfkill/port-53 survey and logs.
+- Obtain non-interactive privilege for `nbutme`, install the hardware/systemd assets, and activate the A2 SoftAP with an SSH recovery guard.
 - On the Spark/Mac: validate SoftAP, captive DNS/probes, real scan/join/error mappings, Avahi, and both handoff paths (Part A).
 - On the Mac: run the reusable BLE central probe against the Spark; defer only Android browser-layer validation.
 - Validate the non-concurrent recovery client on hardware: mDNS status polling, Android candidate-IP sweep/manual-IP fallback, and AP restoration within 20 seconds after every join failure (Priority 8).
