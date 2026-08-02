@@ -1,14 +1,14 @@
 # DGX Spark Onboarding — Build Status
 
 **Overall:** in_progress
-**Current step:** Part A4 — forced Wi-Fi scan against real airspace
-**Updated:** 2026-08-02T00:29:59Z
+**Current step:** Part A5 — encrypted API join to a real network
+**Updated:** 2026-08-02T00:33:38Z
 
 ## Verification matrix
 
 | Verified on hardware | Verified in simulation only | Deferred (no Android) |
 | --- | --- | --- |
-| Spark aarch64/Python 3.12 portability gate; A1 NetworkManager ownership and AP+STA parser; Wi-Fi/Bluetooth rfkill state; A2 concurrent WPA2 SoftAP visibility/association/DHCP/AP address/NAT/STA preservation/PSK alphabet; A3 captive DNS/HTTP probes/catch-all/embedded portal/startup-shutdown cleanup; A4 cached-airspace dedup/bands/6 GHz/security/hidden handling; Mac CoreBluetooth permission/preflight. | Protocol crypto/framing, mock driver, app FSM/screens/error routes, simulator, BlueZ bridge, mDNS publisher, handoff recovery, lifecycle/reset logic, BLE central probe framing/codec self-test. | Chrome Web Bluetooth chooser, user-gesture handling, Location Services prompt, Chrome reconnect/service-cache behaviour, and Android SoftAP fallback/`.local` resolution. |
+| Spark aarch64/Python 3.12 portability gate; A1 NetworkManager ownership and AP+STA parser; Wi-Fi/Bluetooth rfkill state; A2 concurrent WPA2 SoftAP visibility/association/DHCP/AP address/NAT/STA preservation/PSK alphabet; A3 captive DNS/HTTP probes/catch-all/embedded portal/startup-shutdown cleanup; A4 forced-scan generation/raw dBm/bars/dedup/bands/6 GHz/security/hidden handling; Mac CoreBluetooth permission/preflight. | Protocol crypto/framing, mock driver, app FSM/screens/error routes, simulator, BlueZ bridge, mDNS publisher, handoff recovery, lifecycle/reset logic, BLE central probe framing/codec self-test. | Chrome Web Bluetooth chooser, user-gesture handling, Location Services prompt, Chrome reconnect/service-cache behaviour, and Android SoftAP fallback/`.local` resolution. |
 
 ## Milestones
 - [x] 1. Repo skeleton + CI — clean-clone Python and browser test commands passed
@@ -21,6 +21,8 @@
 - [ ] 8. Hardware networking (`v0.4-hw`)
 
 ## Done since last update
+- A4 passes on hardware at `4365ea2`: a forced D-Bus scan advanced `LastScan` from 82,385,591 to 82,399,790 and completed in 1.54 seconds. The normalized result contained 37 entries (18 named, 19 hidden); 29 retained BSSIDs had kernel scan-cache measurements and every reported integer dBm matched the kernel value exactly with zero mismatches. `Droid` deduped 2.4/5/6 GHz at -59 dBm; `Droid_Guest_6GHz` was WPA3/6 GHz; `Xfinity Mobile` was explicitly unsupported 802.1X; and `xfinitywifi` was open.
+- Fixed A4's last simulation artifact (`4365ea2`): forced scans now wait for NetworkManager's `LastScan` generation to advance, then join the D-Bus security/frequency metadata to nl80211 `iw scan dump` signal measurements by BSSID. NetworkManager quality conversion remains only a fallback when a BSSID is absent from the kernel cache. Mac and Spark lint plus all 23 Python tests pass.
 - A3 passes from the Mac as a real AP client at `31c6371`: the agent owns `10.42.0.1:53/udp` and `0.0.0.0:80/tcp`, while NetworkManager's shared `dnsmasq` retains DHCP/NAT. A raw DNS query bound to macOS `en0` returned `10.42.0.1`; Spark `tcpdump` captured request and response. Apple, Android, Windows, and arbitrary-host probes returned 302 to `/portal/`; `/portal/` returned the embedded app; and an unknown path with the AP's own Host returned 404.
 - Replaced the hardware portal placeholder with a self-contained Vite portal embedded in the Python wheel (`31c6371`): 688,468 bytes raw / 189,389 bytes gzipped, no external asset tags, API calls use the current origin, portal mode starts at the secure-channel step, and an Open in Safari escape hatch is present. Python tests (22), browser tests (8), typecheck, inlined-module syntax validation, and wheel-content validation pass.
 - Fixed four A3 hardware defects separately: NetworkManager shared-mode DNS ownership and production responder startup (`c5dde4e`); nested D-Bus `Variant` IP data plus guaranteed AP/DNS cleanup after startup failure or shutdown (`29dd423`); pre-existing management Wi-Fi incorrectly flipping captive probes to online (`91a0a5e`); and default-port Host normalization (`7b3a0cb`). A controlled Ctrl-C removed the AP interface/profile and both listeners while preserving the STA.
@@ -73,19 +75,18 @@
 - Nothing blocks simulator work.
 - Spark-side BLE advertising/GATT validation requires the agent to be deployed and advertising. The Mac side is ready and its CoreBluetooth permission is verified; no Android device is needed for Part C.
 - Real join/error mapping, mDNS, and handoff behavior remain unrun on hardware.
-- A4 forced rescan and exact RSSI validation remain unrun. NetworkManager exposes scan `Strength` as quality percent, not raw dBm; the corrected driver reports a conventional estimate until a raw NL80211 RSSI source is implemented and verified.
 - The physical reset implementation needs the Spark carrier-board GPIO chip/line and an actual button press for validation. Real BlueZ advertising/GATT, AP recovery, Avahi publishing, and mutating D-Bus networking validation remain unrun.
 
 ## Decisions I made that the spec didn't cover
 - The platform serial file is root-readable and contains `1983825003847`; hardware service identity uses it. Unprivileged tools fall back to hostname `spark-0268`, and `SPARK_SERIAL` remains the explicit image override.
-- Preserved the protocol's `rssi` field by converting NetworkManager quality percent to an explicitly documented estimate (`quality / 2 - 100`) rather than continuing to mislabel `quality - 100` as real dBm. This remains a known spec gap pending raw NL80211 data.
+- The scan path uses NetworkManager D-Bus for SSID/security/frequency and joins it by BSSID to nl80211 kernel scan-cache dBm. The conventional NetworkManager quality conversion (`quality / 2 - 100`) is now only a fallback for cache races or unavailable `iw` output.
 - NetworkManager shared mode owns DHCP/NAT but runs its private `dnsmasq` with `port=0`; the agent owns DNS only on the derived AP address. This avoids port 53 collisions without weakening systemd-resolved or replacing NetworkManager's working DHCP/NAT path.
 - Used the complete `iw phy` output for the A1 gate because the hardware plan's suggested `sed` range stops after the first combination and hides the second, AP-capable combination.
 - The simulator starts with HTTP on `localhost:8080`; production SoftAP uses NetworkManager shared mode when hardware mode is selected.
 - The simulator accepts both documented uppercase `SPARK_SIM_FAIL` error codes and concise aliases. `WIFI_NO_INTERNET` proceeds to LAN-only success by design.
 
 ## Next
-- On the Spark/Mac: validate forced real scan, real join/error mappings, Avahi, and the concurrent handoff path (Part A).
+- On the Spark/Mac: validate an encrypted real join, error mappings, Avahi, and the concurrent handoff path (Part A).
 - On the Mac: run the reusable BLE central probe against the Spark; defer only Android browser-layer validation.
 - Validate the non-concurrent recovery client on hardware: mDNS status polling, Android candidate-IP sweep/manual-IP fallback, and AP restoration within 20 seconds after every join failure (Priority 8).
 - Validate the configured physical-reset GPIO button and systemd first-boot/state recovery/claim-lock/rate-limit behavior on the Spark (Priority 9).
