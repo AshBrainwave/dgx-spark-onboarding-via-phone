@@ -1,8 +1,8 @@
 # DGX Spark Onboarding — Build Status
 
 **Overall:** in_progress
-**Current step:** Part B4 — fixed portal rendered with fresh window; waiting for Connect retry
-**Updated:** 2026-08-02T16:49:50Z
+**Current step:** Part B4 — Connect falsely reports portal unreachable; diagnosing browser crypto
+**Updated:** 2026-08-02T16:51:30Z
 
 ## Verification matrix
 
@@ -21,6 +21,7 @@
 - [ ] 8. Hardware networking (`v0.4-hw`)
 
 ## Done since last update
+- Part B4 Connect retry observation: the operator reported “it says u are not connectred to spark.. join DGX spark access point and then return.. and u buttons - show join instructions and open in safari.” The iPhone was already hardware-verified as associated, so this `PORTAL_UNREACHABLE` message is false. The app currently maps every unexpected browser exception—not only transport failures—to that code; the plain-HTTP portal then calls secure-context Web Crypto (`crypto.subtle`) for X25519/HKDF/AES-GCM, making browser crypto availability the leading cause under investigation.
 - Part B4 fixed-portal reload observation: the operator reported “conncet and open in safari,” confirming the page again exposes `Connect` and `Open in Safari` and no longer shows the simulator identity. At verification, the setup window was only 99 seconds old and the iPhone remained authorized and associated; no Connect retry outcome is inferred yet.
 - Reopened the expired window again through the root software entry. Within eight seconds the service and `DGX-Spark-3847` AP were healthy with no warnings; the iPhone then automatically re-associated and was authorized. The fixed portal and fresh session window are ready for one reload.
 - Part B4 reconnect observation: the operator reported “ok checkbox” beside `DGX-Spark-3847`. The Spark confirmed the iPhone authenticated, authorized, and associated at about -48 dBm with DHCP lease `10.42.0.148`. Because 32,612 seconds elapsed since the previous root reopen, the 15-minute setup window expired during the operator pause; it must be reopened again before Connect is retried.
@@ -104,7 +105,7 @@
 
 ## Blocked
 - Nothing blocks simulator work.
-- Part B is intentionally proceeding from one-at-a-time observations from the iPhone operator. B1 passes; B2 auto-open failed but the repaired manual Safari fallback renders; B4 Connect did not reach the network list and instead exposed a baked `Spark-0001` join identity. CNA-specific B3 constraints remain unverified.
+- Part B is intentionally proceeding from one-at-a-time observations from the iPhone operator. B1 passes; B2 auto-open failed but the repaired manual Safari fallback renders; the first B4 attempt exposed a fixed simulator identity leak, and the retry falsely reported portal unreachable despite verified association. CNA-specific B3 constraints remain unverified.
 - A6 conditions other than wrong PSK remain unrun because this pass has no controllable weak-signal, no-DHCP, no-route, captive-portal, 802.1X, or incompatible-band test networks. Their simulation coverage is not reported as hardware verification.
 - The current custom `DGXSPARK:` enrollment QR contains identity/key material but is not an iOS `WIFI:S:...;T:WPA;P:...;;` join QR. A temporary hardware Wi-Fi QR can validate B1, but the one-scan production enrollment/security UX remains unresolved and must not be represented as finished.
 - No provisioning/reset button or named GPIO line is exposed on this DGX Spark. The GPIO watcher remains simulation-only; the full reset semantics were verified through the root software entry point.
@@ -121,6 +122,6 @@
 - The serial-derived AP SSID is authoritative at hardware startup. An existing state file is migrated to that identity without rotating its PSK; callers that do not provide an identity preserve the existing state's SSID across reset.
 
 ## Next
-- Part B4: have the operator tap `Connect` once and record exactly whether the real Wi-Fi network list renders or an error appears.
+- Instrument the portal to distinguish HTTP transport failure from unavailable browser cryptography, reproduce once on iPhone, then implement the security-preserving compatible path rather than weakening PSK protection.
 - Continue B2-B8 one action and one observation at a time; do not infer or batch phone outcomes.
 - Keep the non-concurrent handoff and unavailable A6 failure classes explicitly simulation-only. Android chooser/reconnect/cache, SoftAP fallback, candidate sweep, manual IP, and Android `.local` failure remain deferred because no Android device exists for this pass.
