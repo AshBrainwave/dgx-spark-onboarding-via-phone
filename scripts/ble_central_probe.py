@@ -319,6 +319,8 @@ async def run_probe(args: argparse.Namespace) -> None:
         raise ProbeError("--provision and --factory-reset are mutually exclusive")
     if args.rate_limit_test and not args.provision:
         raise ProbeError("--rate-limit-test requires --provision")
+    if args.claim and not args.provision:
+        raise ProbeError("--claim requires --provision")
     BleakClient, _, BleakError = _load_bleak()
     device, advertisement = await discover_target(args.scan_timeout, args.address)
     verify_advertisement(device, advertisement)
@@ -435,8 +437,25 @@ async def run_probe(args: argparse.Namespace) -> None:
                 )
 
             if args.factory_reset:
+                claimed, _, _ = await transport.send(
+                    request(
+                        "factory-reset-claim",
+                        "device.claim",
+                        sid,
+                        {"owner_label": "hardware reset probe"},
+                    ),
+                    timeout=args.request_timeout,
+                )
+                owner_token = require_ok(claimed, "device.claim").get("owner_token")
+                if not isinstance(owner_token, str):
+                    raise ProbeError("device.claim did not return an owner token")
                 reset, _, _ = await transport.send(
-                    request("factory-reset", "device.factory_reset", sid, {}),
+                    request(
+                        "factory-reset",
+                        "device.factory_reset",
+                        sid,
+                        {"confirm": True, "owner_token": owner_token},
+                    ),
                     timeout=args.request_timeout,
                 )
                 require_ok(reset, "device.factory_reset")
@@ -501,6 +520,24 @@ async def run_probe(args: argparse.Namespace) -> None:
                     f"real Wi-Fi join did not finish within {args.provision_timeout:.0f}s"
                 )
             if not args.rate_limit_test:
+                if args.claim:
+                    claimed, _, _ = await transport.send(
+                        request(
+                            "device-claim",
+                            "device.claim",
+                            sid,
+                            {"owner_label": "hardware provisioning probe"},
+                        ),
+                        timeout=args.request_timeout,
+                    )
+                    owner_token = require_ok(claimed, "device.claim").get(
+                        "owner_token"
+                    )
+                    if not isinstance(owner_token, str) or len(owner_token) < 40:
+                        raise ProbeError("device.claim returned an invalid owner token")
+                    print(
+                        "PASS A8 acknowledgement: device claimed; concurrent SoftAP teardown scheduled"
+                    )
                 return
 
             counter = 2
@@ -610,6 +647,11 @@ def parse_args() -> argparse.Namespace:
         "--rate-limit-test",
         action="store_true",
         help="after provisioning, verify retry backoff and the five-attempt session limit",
+    )
+    parser.add_argument(
+        "--claim",
+        action="store_true",
+        help="claim the device after successful provisioning to acknowledge handoff",
     )
     return parser.parse_args()
 

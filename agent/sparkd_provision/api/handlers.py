@@ -41,6 +41,7 @@ class Handlers:
         self.connect_attempts = 0
         self.next_connect_at: datetime | None = None
         self._handoff_task: asyncio.Task[None] | None = None
+        self._ap_teardown_task: asyncio.Task[None] | None = None
         self._connect_requested = False
 
     async def handle(self, request: dict[str, Any]) -> dict[str, Any]:
@@ -147,8 +148,14 @@ class Handlers:
             self._connect_requested = False
             return response(message_id, {})
         if op == "device.claim":
+            if self.state.state.claimed:
+                return error(message_id, "UNAUTHORIZED")
             self.owner_token = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode().rstrip("=")
             self.state.claim(self.owner_token)
+            if self.driver.supports_concurrent_ap_sta and await self.provisioning_online():
+                self._ap_teardown_task = asyncio.create_task(
+                    self._teardown_ap_after_ack()
+                )
             return response(message_id, {"owner_token": self.owner_token})
         if op == "device.rename":
             if not self.state.token_matches(body.get("owner_token")):
@@ -157,6 +164,8 @@ class Handlers:
             self.state.save()
             return response(message_id, {"name": self.state.state.name})
         if op == "device.factory_reset":
+            if not self.state.token_matches(body.get("owner_token")):
+                return error(message_id, "UNAUTHORIZED")
             await self.factory_reset()
             return response(message_id, {})
         return error(message_id, "UNKNOWN_OPERATION")
@@ -166,6 +175,9 @@ class Handlers:
         if self._handoff_task:
             self._handoff_task.cancel()
             self._handoff_task = None
+        if self._ap_teardown_task:
+            self._ap_teardown_task.cancel()
+            self._ap_teardown_task = None
         self._release_session()
         self.state.reset()
         self._connect_requested = False
@@ -199,3 +211,9 @@ class Handlers:
             if status.phase == "failed":
                 await self.driver.softap_up(self.state.state.ap_ssid, self.state.state.ap_psk)
                 return
+
+    async def _teardown_ap_after_ack(self) -> None:
+        """Leave enough time for the claim/rename replies before removing the AP."""
+        await asyncio.sleep(2)
+        await self.driver.softap_down()
+        self._ap_teardown_task = None

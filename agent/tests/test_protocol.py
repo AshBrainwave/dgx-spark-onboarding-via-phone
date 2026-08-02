@@ -545,6 +545,69 @@ async def test_factory_reset_reopens_window_rotates_ap_and_restores_recovery_ap(
     assert state_path.stat().st_mode & 0o777 == 0o600
 
 
+async def test_factory_reset_operation_requires_owner_token(tmp_path) -> None:
+    state = StateStore(tmp_path / "state.json")
+    state.claim("owner-token")
+    handlers = Handlers(MockDriver(), state)
+    handlers.sid = "session"
+
+    denied = await handlers.handle(
+        {
+            "v": 1,
+            "id": "denied-reset",
+            "op": "device.factory_reset",
+            "sid": "session",
+            "body": {"confirm": True, "owner_token": "wrong"},
+        }
+    )
+
+    assert denied["err"]["code"] == "UNAUTHORIZED"
+    assert state.state.claimed is True
+
+    accepted = await handlers.handle(
+        {
+            "v": 1,
+            "id": "accepted-reset",
+            "op": "device.factory_reset",
+            "sid": "session",
+            "body": {"confirm": True, "owner_token": "owner-token"},
+        }
+    )
+
+    assert accepted["ok"] is True
+    assert state.state.claimed is False
+
+
+async def test_concurrent_claim_acknowledgement_tears_down_softap(monkeypatch) -> None:
+    monkeypatch.setenv("SPARK_SIM_CONCURRENT_AP_STA", "1")
+    driver = MockDriver()
+    driver._status = LinkStatus(phase="online", ssid="Home", ip="192.168.1.44")
+    handlers = Handlers(driver)
+    handlers.sid = "session"
+    handlers._connect_requested = True
+
+    async def teardown() -> None:
+        await driver.softap_down()
+
+    handlers._teardown_ap_after_ack = teardown  # type: ignore[method-assign]
+
+    claimed = await handlers.handle(
+        {
+            "v": 1,
+            "id": "claim",
+            "op": "device.claim",
+            "sid": "session",
+            "body": {"owner_label": "phone"},
+        }
+    )
+
+    assert claimed["ok"] is True
+    assert claimed["body"]["owner_token"]
+    assert handlers._ap_teardown_task is not None
+    await handlers._ap_teardown_task
+    assert driver.ap_down_calls == 1
+
+
 async def test_mdns_publishes_resolvable_alias_on_production_port() -> None:
     calls = []
 

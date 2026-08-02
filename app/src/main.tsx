@@ -125,7 +125,7 @@ function App() {
       case "password": return <Password ssid={selectedSsid} onSubmit={connect} />;
       case "applying": return <Applying phase={phase} elapsed={elapsed} />;
       case "reconnect": return <Reconnect ssid={selectedSsid} seconds={20} onManualIp={useManualIp} />;
-      case "success": return <Success ip={ip || "192.168.1.44"} hostname="dgx-spark-sim" onName={async name => { try { await client.call("device.rename", { name }); } catch { /* Naming is optional after success. */ } }} />;
+      case "success": return <Success ip={ip || "192.168.1.44"} hostname={mdnsName} onFinish={async name => { const claim = await client.call("device.claim", { owner_label: "phone onboarding" }); await client.call("device.rename", { name, owner_token: claim.owner_token }); }} />;
       case "error": return <ErrorScreen code={error} ssid={selected?.ssid} onBack={() => {
         const target = errorCopy[error].target;
         if (target === "password") setScreen("password");
