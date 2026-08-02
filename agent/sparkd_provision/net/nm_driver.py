@@ -7,6 +7,7 @@ The driver is instantiated only on hardware; the simulator continues to use Mock
 from __future__ import annotations
 
 import asyncio
+import re
 from collections.abc import Iterable
 from dataclasses import replace
 from typing import Any
@@ -77,12 +78,12 @@ def _security(flags: int, wpa_flags: int, rsn_flags: int) -> tuple[str, bool, st
     return "open", False, None
 
 
-def _network_from_properties(values: dict[str, Any]) -> Network:
+def _network_from_properties(values: dict[str, Any], raw_rssi: float | None = None) -> Network:
     ssid = NetworkManagerDriver._ssid(values.get("Ssid", b""))
     strength = max(0, min(100, int(values.get("Strength", 0))))
     # NetworkManager exposes quality percent, not dBm. Its conventional inverse
     # maps 0..100 quality to approximately -100..-50 dBm.
-    rssi = _quality_to_rssi(strength)
+    rssi = round(raw_rssi) if raw_rssi is not None else _quality_to_rssi(strength)
     if rssi >= -60:
         bars = 4
     elif rssi >= -70:
@@ -126,6 +127,20 @@ def _deduplicate_networks(networks: list[Network]) -> list[Network]:
         seen_bands = sorted(bands[key], key=band_order.__getitem__)
         normalized.append(replace(network, bands=seen_bands if len(seen_bands) > 1 else None))
     return sorted(normalized, key=lambda item: item.rssi, reverse=True)
+
+
+def _raw_rssi_from_iw(output: str) -> dict[str, float]:
+    readings: dict[str, float] = {}
+    bssid: str | None = None
+    for line in output.splitlines():
+        match = re.match(r"^BSS ([0-9a-fA-F:]{17})(?:\(|\s|$)", line)
+        if match:
+            bssid = match.group(1).lower()
+            continue
+        match = re.match(r"^\s*signal:\s*(-?\d+(?:\.\d+)?)\s+dBm", line)
+        if bssid and match:
+            readings[bssid] = float(match.group(1))
+    return readings
 
 
 class NetworkManagerError(RuntimeError):
@@ -249,14 +264,39 @@ class NetworkManagerDriver(NetDriver):
     async def scan(self, force: bool = False) -> list[Network]:
         self._status = LinkStatus(phase="scanning")
         if force:
+            previous_scan = int(await self._property(self.device_path, NM_WIRELESS, "LastScan"))
             await self._call(self.device_path, NM_WIRELESS, "RequestScan", "a{sv}", [{}])
+            for _ in range(100):
+                if int(await self._property(self.device_path, NM_WIRELESS, "LastScan")) > previous_scan:
+                    break
+                await asyncio.sleep(0.1)
         access_points = await self._call(self.device_path, NM_WIRELESS, "GetAllAccessPoints")
+        raw_rssi = await self._raw_rssi()
         networks: list[Network] = []
         for path in access_points:
             values = await self._properties(path, NM_AP)
-            networks.append(_network_from_properties(values))
+            bssid = str(values.get("HwAddress", "")).lower()
+            networks.append(_network_from_properties(values, raw_rssi.get(bssid)))
         self._status = LinkStatus()
         return _deduplicate_networks(networks)
+
+    async def _raw_rssi(self) -> dict[str, float]:
+        try:
+            process = await asyncio.create_subprocess_exec(
+                "iw",
+                "dev",
+                self.interface,
+                "scan",
+                "dump",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+        except OSError:
+            return {}
+        output, _ = await process.communicate()
+        if process.returncode:
+            return {}
+        return _raw_rssi_from_iw(output.decode(errors="replace"))
 
     async def connect(self, ssid: str, psk: str, security: str, hidden: bool = False) -> None:
         if security == "wpa2-enterprise":

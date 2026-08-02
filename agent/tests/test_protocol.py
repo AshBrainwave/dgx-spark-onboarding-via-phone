@@ -21,6 +21,7 @@ from sparkd_provision.net.nm_driver import (
     _channel,
     _deduplicate_networks,
     _network_from_properties,
+    _raw_rssi_from_iw,
     _ssid_variant,
     _unbox,
 )
@@ -290,6 +291,31 @@ def test_real_networkmanager_scan_shapes_are_normalized() -> None:
     assert hidden.ssid == ""
     assert hidden.security == "wpa2-psk"
     assert _ssid_variant("Droid").value == b"Droid"
+
+
+def test_kernel_scan_rssi_enriches_networkmanager_bssid() -> None:
+    readings = _raw_rssi_from_iw(
+        """BSS 0c:ef:15:d3:98:9c(on wlP9s9)
+\tsignal: -59.00 dBm
+BSS 2e:ef:15:d3:99:59(on wlP9s9)
+\tsignal: -81.50 dBm
+"""
+    )
+    assert readings == {"0c:ef:15:d3:98:9c": -59.0, "2e:ef:15:d3:99:59": -81.5}
+    network = _network_from_properties(
+        {
+            "Ssid": b"Droid",
+            "HwAddress": "0C:EF:15:D3:98:9C",
+            "Frequency": 2437,
+            "Strength": 67,
+            "Flags": 1,
+            "WpaFlags": 0,
+            "RsnFlags": 0x488,
+        },
+        readings["0c:ef:15:d3:98:9c"],
+    )
+    assert network.rssi == -59
+    assert network.bars == 4
 
 
 def test_hardware_identity_drives_radio_and_handoff_names(tmp_path) -> None:
