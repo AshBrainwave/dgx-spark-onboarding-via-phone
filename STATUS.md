@@ -1,8 +1,8 @@
 # DGX Spark Onboarding — Build Status
 
 **Overall:** in_progress
-**Current step:** Part B4 — fresh window and phone association verified; waiting for portal reload
-**Updated:** 2026-08-02T16:48:31Z
+**Current step:** Part B4 — fixed portal rendered with fresh window; waiting for Connect retry
+**Updated:** 2026-08-02T16:49:50Z
 
 ## Verification matrix
 
@@ -21,6 +21,7 @@
 - [ ] 8. Hardware networking (`v0.4-hw`)
 
 ## Done since last update
+- Part B4 fixed-portal reload observation: the operator reported “conncet and open in safari,” confirming the page again exposes `Connect` and `Open in Safari` and no longer shows the simulator identity. At verification, the setup window was only 99 seconds old and the iPhone remained authorized and associated; no Connect retry outcome is inferred yet.
 - Reopened the expired window again through the root software entry. Within eight seconds the service and `DGX-Spark-3847` AP were healthy with no warnings; the iPhone then automatically re-associated and was authorized. The fixed portal and fresh session window are ready for one reload.
 - Part B4 reconnect observation: the operator reported “ok checkbox” beside `DGX-Spark-3847`. The Spark confirmed the iPhone authenticated, authorized, and associated at about -48 dBm with DHCP lease `10.42.0.148`. Because 32,612 seconds elapsed since the previous root reopen, the 15-minute setup window expired during the operator pause; it must be reopened again before Connect is retried.
 - Deployed `9fe784b` after 32 Spark-side Python tests and lint passed, then reopened the expired window through the root software entry and restarted the service. Hardware state reports `DGX-Spark-3847` with a fresh window, the portal contains neither simulator credential, and the service has no warnings. The iPhone did not automatically re-associate within the 20-second check after this restart; its previous DHCP lease remains on disk but no live station was present, so a manual AP reconnect is required before reloading Safari.
@@ -120,6 +121,6 @@
 - The serial-derived AP SSID is authoritative at hardware startup. An existing state file is migrated to that identity without rotating its PSK; callers that do not provide an identity preserve the existing state's SSID across reset.
 
 ## Next
-- Part B4: have the operator reload the existing Safari portal once, then record exactly which screen appears before tapping anything.
+- Part B4: have the operator tap `Connect` once and record exactly whether the real Wi-Fi network list renders or an error appears.
 - Continue B2-B8 one action and one observation at a time; do not infer or batch phone outcomes.
 - Keep the non-concurrent handoff and unavailable A6 failure classes explicitly simulation-only. Android chooser/reconnect/cache, SoftAP fallback, candidate sweep, manual IP, and Android `.local` failure remain deferred because no Android device exists for this pass.
