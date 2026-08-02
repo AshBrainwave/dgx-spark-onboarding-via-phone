@@ -437,11 +437,14 @@ async def run_probe(args: argparse.Namespace) -> None:
                 return
             if not args.ssid:
                 raise ProbeError("--provision requires --ssid")
-            psk = (
-                ""
-                if args.security == "open"
-                else getpass.getpass(f"Wi-Fi password for {args.ssid}: ")
-            )
+            if args.security == "open":
+                psk = ""
+            elif args.psk_stdin:
+                psk = sys.stdin.readline().rstrip("\r\n")
+                if not psk:
+                    raise ProbeError("--psk-stdin received an empty Wi-Fi password")
+            else:
+                psk = getpass.getpass(f"Wi-Fi password for {args.ssid}: ")
             encrypted = encrypt_psk(key, 1, args.ssid, psk)
             connected, _, _ = await transport.send(
                 request(
@@ -525,6 +528,11 @@ def parse_args() -> argparse.Namespace:
         "--security", default="wpa2-psk", choices=("open", "wpa2-psk", "wpa3-sae")
     )
     parser.add_argument("--hidden", action="store_true")
+    parser.add_argument(
+        "--psk-stdin",
+        action="store_true",
+        help="read the Wi-Fi password from standard input instead of the terminal",
+    )
     parser.add_argument("--band-pref", choices=("2.4ghz", "5ghz", "6ghz"))
     parser.add_argument("--provision-timeout", type=float, default=90)
     return parser.parse_args()
