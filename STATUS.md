@@ -1,8 +1,8 @@
 # DGX Spark Onboarding — Build Status
 
 **Overall:** in_progress
-**Current step:** Part B4 — Connect falsely reports portal unreachable; diagnosing browser crypto
-**Updated:** 2026-08-02T16:51:30Z
+**Current step:** Part B4 — deploying plain-HTTP browser crypto compatibility fix
+**Updated:** 2026-08-02T16:54:39Z
 
 ## Verification matrix
 
@@ -21,6 +21,7 @@
 - [ ] 8. Hardware networking (`v0.4-hw`)
 
 ## Done since last update
+- Replaced the portal's secure-context-only `crypto.subtle` dependency with audited, browser-native JavaScript primitives from Noble: X25519, HKDF-SHA256, and AES-256-GCM. The byte-level protocol is unchanged: existing Python-produced vectors still match exactly, SSID remains AES-GCM AAD, and the PSK remains encrypted. A regression test removes `SubtleCrypto` and still generates a valid X25519 pair. The self-contained portal is 206,150 bytes gzipped, below the 300 KB limit; 11 browser tests, typecheck, portal build, 32 Python tests, Python lint, and dependency audit pass.
 - Part B4 Connect retry observation: the operator reported “it says u are not connectred to spark.. join DGX spark access point and then return.. and u buttons - show join instructions and open in safari.” The iPhone was already hardware-verified as associated, so this `PORTAL_UNREACHABLE` message is false. The app currently maps every unexpected browser exception—not only transport failures—to that code; the plain-HTTP portal then calls secure-context Web Crypto (`crypto.subtle`) for X25519/HKDF/AES-GCM, making browser crypto availability the leading cause under investigation.
 - Part B4 fixed-portal reload observation: the operator reported “conncet and open in safari,” confirming the page again exposes `Connect` and `Open in Safari` and no longer shows the simulator identity. At verification, the setup window was only 99 seconds old and the iPhone remained authorized and associated; no Connect retry outcome is inferred yet.
 - Reopened the expired window again through the root software entry. Within eight seconds the service and `DGX-Spark-3847` AP were healthy with no warnings; the iPhone then automatically re-associated and was authorized. The fixed portal and fresh session window are ready for one reload.
@@ -120,8 +121,9 @@
 - The carrier presents only an ACPI power button; the unnamed 182-line SoC GPIO controller is not safe to probe blindly. Hardware reset validation therefore used the root software entry specified by Part D.
 - Avahi alias publication uses `AVAHI_PUBLISH_NO_REVERSE`: the existing `spark-0268.local` name legitimately owns the reverse record for `192.168.68.87`, while the onboarding alias needs only its forward A record.
 - The serial-derived AP SSID is authoritative at hardware startup. An existing state file is migrated to that identity without rotating its PSK; callers that do not provide an identity preserve the existing state's SSID across reset.
+- Captive-portal cryptography cannot depend on secure-context-only Web Crypto because the AP deliberately serves plain HTTP. The portal uses audited pure-JavaScript primitives for the same X25519/HKDF-SHA256/AES-256-GCM wire protocol; weakening or removing application-layer PSK encryption is rejected.
 
 ## Next
-- Instrument the portal to distinguish HTTP transport failure from unavailable browser cryptography, reproduce once on iPhone, then implement the security-preserving compatible path rather than weakening PSK protection.
+- Deploy the browser crypto compatibility fix, reopen the window if deployment consumes it, verify the iPhone re-associates, then retry Connect once.
 - Continue B2-B8 one action and one observation at a time; do not infer or batch phone outcomes.
 - Keep the non-concurrent handoff and unavailable A6 failure classes explicitly simulation-only. Android chooser/reconnect/cache, SoftAP fallback, candidate sweep, manual IP, and Android `.local` failure remain deferred because no Android device exists for this pass.

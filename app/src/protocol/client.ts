@@ -17,7 +17,7 @@ export class ProtocolError extends Error {
 
 export class Client {
   sid: string | null = null;
-  private sessionKey: CryptoKey | null = null;
+  private sessionKey: Uint8Array | null = null;
   private counter = 0;
 
   constructor(private transport: Transport) {}
