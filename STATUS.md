@@ -1,14 +1,14 @@
 # DGX Spark Onboarding — Build Status
 
 **Overall:** in_progress
-**Current step:** Part D — physical reset and first-boot/state recovery
-**Updated:** 2026-08-02T05:57:24Z
+**Current step:** Part B1 — iPhone QR join (waiting for operator observation)
+**Updated:** 2026-08-02T06:29:14Z
 
 ## Verification matrix
 
 | Verified on hardware | Verified in simulation only | Deferred (no Android) |
 | --- | --- | --- |
-| Spark aarch64/Python 3.12 portability gate; A1 NetworkManager ownership and AP+STA parser; Wi-Fi/Bluetooth rfkill state; A2 concurrent WPA2 SoftAP visibility/association/DHCP/AP address/NAT/STA preservation/PSK alphabet; A3 captive DNS/HTTP probes/catch-all/embedded portal/startup-shutdown cleanup; A4 forced-scan generation/raw dBm/bars/dedup/bands/6 GHz/security/hidden handling; A5 HTTP X25519/HKDF/AES-GCM join/association/DHCP/status/concurrent-AP preservation; A6 wrong-PSK mapping; Mac CoreBluetooth permission/preflight; BlueZ advertisement/GATT bridge; BLE central probe C1-C5 including framing, encrypted provisioning, and negative paths. | Protocol crypto/framing, mock driver, app FSM/screens/error routes, simulator, mDNS publisher, handoff recovery, lifecycle/reset logic. | Chrome Web Bluetooth chooser, user-gesture handling, Location Services prompt, Chrome reconnect/service-cache behaviour, and Android SoftAP fallback/`.local` resolution. |
+| Spark aarch64/Python 3.12 portability gate; A1 NetworkManager ownership and AP+STA parser; Wi-Fi/Bluetooth rfkill state; A2 concurrent WPA2 SoftAP visibility/association/DHCP/AP address/NAT/STA preservation/PSK alphabet; A3 captive DNS/HTTP probes/catch-all/embedded portal/startup-shutdown cleanup; A4 forced-scan generation/raw dBm/bars/dedup/bands/6 GHz/security/hidden handling; A5 HTTP X25519/HKDF/AES-GCM join/association/DHCP/status/concurrent-AP preservation; A6 wrong-PSK mapping; A7 Avahi alias/service publication and Mac `.local` resolution; A8 concurrent handoff acknowledgement/AP teardown; A9 online captive-probe responses; Mac CoreBluetooth permission/preflight; BlueZ advertisement/GATT/window lifecycle; BLE central probe C1-C5; systemd boot/SIGKILL recovery; durable state/window/claim/backoff/rate-limit/root-reset lifecycle. | Protocol crypto/framing, mock driver, app FSM/screens/error routes, simulator, non-concurrent handoff recovery, and the GPIO button watcher (no provisioning/reset button is exposed on this Spark). | Chrome Web Bluetooth chooser, user-gesture handling, Location Services prompt, Chrome reconnect/service-cache behaviour, Android SoftAP fallback, Android Chrome `.local` failure, candidate-IP sweep, and manual-IP fallback. |
 
 ## Milestones
 - [x] 1. Repo skeleton + CI — clean-clone Python and browser test commands passed
@@ -21,6 +21,12 @@
 - [ ] 8. Hardware networking (`v0.4-hw`)
 
 ## Done since last update
+- Part D passes through the real root/software recovery entry because the DGX Spark exposes no provisioning/reset button. The kernel exposes one unnamed 182-line `pinctrl_paris` GPIO controller, while the chassis power control is a separate ACPI `Power Button`; NVIDIA's hardware guide lists only that power button. Guessing an unnamed raw line was rejected. The software reset cleared claim/session data, rotated the AP-password hash, reopened the window, restored the concurrent SoftAP, and preserved the home STA.
+- Part D persisted-state checks pass. `/var/lib/sparkd-provision/state.json` remains root-owned mode 0600. A real `SIGKILL` during an open session produced a new systemd PID, valid state, restored AP+STA, and a fresh session after readiness. A real reboot changed the boot ID and automatically started the enabled service; AP, STA, BLE, and SSH returned. A second client received `SESSION_BUSY`; early retries received `RETRY_BACKOFF`; five connects were accepted and attempt six received `RATE_LIMITED`.
+- Fixed claimed/expired lifecycle leakage (`bda0cea`): a claimed restart no longer recreates the setup AP, and BLE advertising now follows persisted `provisioning_open && !claimed` state. With the device claimed, BlueZ reported zero advertising instances, the AP interface was absent, and CoreBluetooth saw 30 other devices but no Spark. A synthetically aged 16-minute window likewise stopped advertising and rejected sessions; the root reopen entry restored advertising. Reset again restored AP/DNS/HTTP and advertising.
+- A8 concurrent handoff passes at `e6f58f7`: full success was returned with LAN IP `192.168.68.87` while the AP remained active. An explicit `device.claim` acknowledgement then returned an owner token; two seconds later `wlP9s9-ap` and its profile were gone while the home STA, SSH, and agent stayed online. The portal now exposes this boundary as `Finish setup`, uses the real mDNS hostname, and includes the owner token for rename. Remote factory reset now requires that owner token; the root/physical callback remains the recovery bypass.
+- A9 passes on the real `10.42.0.1:80` AP listener after online status: Apple returned the exact 68-byte Success HTML, Android returned 204 with an empty body, and Windows returned the exact `Microsoft Connect Test` body. The setup AP was still active during all three checks.
+- A7 passes after two hardware fixes. The first implementation advertised unreachable `dgx-spark-3847.local:8080`; it now publishes the production port 80 plus an IPv4 alias record (`d400007`). Avahi initially rejected that alias because its reverse record collided with the host's existing `spark-0268.local` PTR; `AVAHI_PUBLISH_NO_REVERSE` fixed it (`9222fe1`). The Spark resolves the alias to `192.168.68.87`; macOS `dns-sd` resolves `_dgx-spark._tcp` to `dgx-spark-3847.local:80`; and Mac ping completed with zero loss.
 - C1-C5 pass between this Mac's CoreBluetooth central and the Spark's real BlueZ peripheral. The advertisement contained the required 128-bit service UUID and local name `DGX Spark 3847` at -57 to -63 dBm; GATT exposed the required RX/TX/INFO properties; the INFO serial/public key matched framed `device.info`; an incomplete request produced `BLE_REASSEMBLY_TIMEOUT` after 10.3 seconds; a 36-network scan returned 1,340 encoded bytes over 84 notification fragments; invalid ciphertext returned `INVALID_CIPHERTEXT`; and the peripheral stayed connected.
 - Fixed the first real BLE defect (`c2cb229`): every RX fragment reached the Spark over ATT, but BlueZ emitted no notification because CTRL_TX signalled `Value` without exporting that GATT property. CTRL_TX now owns a read-only `Value` property and updates it before `PropertiesChanged`; the identical hardware probe then passed.
 - C4 encrypted provisioning passes entirely over BLE. The probe opened a fresh X25519/HKDF session, encrypted the already-saved `Droid_IoT` credential with AES-GCM, and sent it without printing, logging, or placing it on a command line. The Spark reported `associating`, `dhcp`, then `online` at `192.168.68.87`; the guarded recovery timer was cancelled. Added explicit secure-stdin support to the reusable probe (`7a1221b`).
@@ -79,9 +85,10 @@
 
 ## Blocked
 - Nothing blocks simulator work.
-- Spark-side BLE advertising/GATT validation requires the agent to be deployed and advertising. The Mac side is ready and its CoreBluetooth permission is verified; no Android device is needed for Part C.
-- Real error mapping, mDNS, and handoff behavior remain unrun on hardware.
-- The physical reset implementation needs the Spark carrier-board GPIO chip/line and an actual button press for validation. Real BlueZ advertising/GATT, AP recovery, Avahi publishing, and mutating D-Bus networking validation remain unrun.
+- Part B is intentionally waiting on one-at-a-time observations from the iPhone operator; no phone outcome has been inferred.
+- A6 conditions other than wrong PSK remain unrun because this pass has no controllable weak-signal, no-DHCP, no-route, captive-portal, 802.1X, or incompatible-band test networks. Their simulation coverage is not reported as hardware verification.
+- The current custom `DGXSPARK:` enrollment QR contains identity/key material but is not an iOS `WIFI:S:...;T:WPA;P:...;;` join QR. A temporary hardware Wi-Fi QR can validate B1, but the one-scan production enrollment/security UX remains unresolved and must not be represented as finished.
+- No provisioning/reset button or named GPIO line is exposed on this DGX Spark. The GPIO watcher remains simulation-only; the full reset semantics were verified through the root software entry point.
 
 ## Decisions I made that the spec didn't cover
 - The platform serial file is root-readable and contains `1983825003847`; hardware service identity uses it. Unprivileged tools fall back to hostname `spark-0268`, and `SPARK_SERIAL` remains the explicit image override.
@@ -90,9 +97,10 @@
 - Used the complete `iw phy` output for the A1 gate because the hardware plan's suggested `sed` range stops after the first combination and hides the second, AP-capable combination.
 - The simulator starts with HTTP on `localhost:8080`; production SoftAP uses NetworkManager shared mode when hardware mode is selected.
 - The simulator accepts both documented uppercase `SPARK_SIM_FAIL` error codes and concise aliases. `WIFI_NO_INTERNET` proceeds to LAN-only success by design.
+- The carrier presents only an ACPI power button; the unnamed 182-line SoC GPIO controller is not safe to probe blindly. Hardware reset validation therefore used the root software entry specified by Part D.
+- Avahi alias publication uses `AVAHI_PUBLISH_NO_REVERSE`: the existing `spark-0268.local` name legitimately owns the reverse record for `192.168.68.87`, while the onboarding alias needs only its forward A record.
 
 ## Next
-- On the Spark/Mac: validate real NetworkManager error mappings, Avahi, and the concurrent handoff path (Part A).
-- On the Mac: run the reusable BLE central probe against the Spark; defer only Android browser-layer validation.
-- Validate the non-concurrent recovery client on hardware: mDNS status polling, Android candidate-IP sweep/manual-IP fallback, and AP restoration within 20 seconds after every join failure (Priority 8).
-- Validate the configured physical-reset GPIO button and systemd first-boot/state recovery/claim-lock/rate-limit behavior on the Spark (Priority 9).
+- Part B1: show the operator one current hardware Wi-Fi QR and record exactly whether iOS offers and completes the join.
+- Continue B2-B8 one action and one observation at a time; do not infer or batch phone outcomes.
+- Keep the non-concurrent handoff and unavailable A6 failure classes explicitly simulation-only. Android chooser/reconnect/cache, SoftAP fallback, candidate sweep, manual IP, and Android `.local` failure remain deferred because no Android device exists for this pass.
