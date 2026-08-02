@@ -317,6 +317,8 @@ def validate_info(raw: bytes) -> dict[str, Any]:
 async def run_probe(args: argparse.Namespace) -> None:
     if args.provision and args.factory_reset:
         raise ProbeError("--provision and --factory-reset are mutually exclusive")
+    if args.rate_limit_test and not args.provision:
+        raise ProbeError("--rate-limit-test requires --provision")
     BleakClient, _, BleakError = _load_bleak()
     device, advertisement = await discover_target(args.scan_timeout, args.address)
     verify_advertisement(device, advertisement)
@@ -477,6 +479,7 @@ async def run_probe(args: argparse.Namespace) -> None:
             require_ok(connected, "wifi.connect")
             print("PASS C4 encrypted wifi.connect accepted; polling real link state")
             deadline = time.monotonic() + args.provision_timeout
+            online = False
             while time.monotonic() < deadline:
                 status_response, _, _ = await transport.send(
                     request("wifi-status", "wifi.status", sid, {}),
@@ -488,12 +491,62 @@ async def run_probe(args: argparse.Namespace) -> None:
                 )
                 if status.get("phase") == "online":
                     print(f"PASS C4 provisioning: online at {status.get('ip')}")
-                    return
+                    online = True
+                    break
                 if status.get("phase") == "failed":
                     raise ProbeError(f"real Wi-Fi join failed: {status.get('err')}")
                 await asyncio.sleep(1)
-            raise ProbeError(
-                f"real Wi-Fi join did not finish within {args.provision_timeout:.0f}s"
+            if not online:
+                raise ProbeError(
+                    f"real Wi-Fi join did not finish within {args.provision_timeout:.0f}s"
+                )
+            if not args.rate_limit_test:
+                return
+
+            counter = 2
+
+            async def retry_connect(label: str) -> dict[str, Any]:
+                nonlocal counter
+                ciphertext = encrypt_psk(key, counter, args.ssid, psk)
+                counter += 1
+                response, _, _ = await transport.send(
+                    request(
+                        label,
+                        "wifi.connect",
+                        sid,
+                        {
+                            "ssid": args.ssid,
+                            "security": args.security,
+                            "psk_enc": ciphertext,
+                            "hidden": args.hidden,
+                            "band_pref": args.band_pref,
+                        },
+                    ),
+                    timeout=args.request_timeout,
+                )
+                return response
+
+            require_ok(await retry_connect("rate-attempt-2"), "wifi.connect attempt 2")
+            for attempt, delay in ((3, 1.1), (4, 3.1), (5, 7.1)):
+                rejected = await retry_connect(f"backoff-before-{attempt}")
+                code = rejected.get("err", {}).get("code")
+                if code != "RETRY_BACKOFF":
+                    raise ProbeError(
+                        f"attempt {attempt} during backoff returned {code!r}, expected RETRY_BACKOFF"
+                    )
+                await asyncio.sleep(delay)
+                require_ok(
+                    await retry_connect(f"rate-attempt-{attempt}"),
+                    f"wifi.connect attempt {attempt}",
+                )
+            limited = await retry_connect("rate-attempt-6")
+            code = limited.get("err", {}).get("code")
+            if code != "RATE_LIMITED":
+                raise ProbeError(
+                    f"sixth connect attempt returned {code!r}, expected RATE_LIMITED"
+                )
+            print(
+                "PASS D backoff/rate limit: early retries returned RETRY_BACKOFF and attempt 6 returned RATE_LIMITED"
             )
     except BleakError as exc:
         raise ProbeError(f"CoreBluetooth/GATT operation failed: {exc}") from exc
@@ -553,6 +606,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--band-pref", choices=("2.4ghz", "5ghz", "6ghz"))
     parser.add_argument("--provision-timeout", type=float, default=90)
+    parser.add_argument(
+        "--rate-limit-test",
+        action="store_true",
+        help="after provisioning, verify retry backoff and the five-attempt session limit",
+    )
     return parser.parse_args()
 
 
