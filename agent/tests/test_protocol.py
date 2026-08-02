@@ -393,6 +393,30 @@ def test_hardware_identity_drives_radio_and_handoff_names(tmp_path) -> None:
     assert state.state.ap_ssid == "DGX-Spark-0268"
 
 
+def test_state_store_preserves_existing_identity_without_override(tmp_path) -> None:
+    state_path = tmp_path / "state.json"
+    state = StateStore(state_path, ap_ssid="DGX-Spark-3847")
+    state.save()
+
+    reopened = StateStore(state_path)
+    reopened.reset()
+
+    assert reopened.state.ap_ssid == "DGX-Spark-3847"
+
+
+def test_state_store_repairs_stale_identity_from_hardware_override(tmp_path) -> None:
+    state_path = tmp_path / "state.json"
+    stale = StateStore(state_path)
+    stale.save()
+    original_password = stale.state.ap_psk
+
+    repaired = StateStore(state_path, ap_ssid="DGX-Spark-3847")
+
+    assert repaired.state.ap_ssid == "DGX-Spark-3847"
+    assert repaired.state.ap_psk == original_password
+    assert json.loads(state_path.read_text())["ap_ssid"] == "DGX-Spark-3847"
+
+
 async def test_concurrent_softap_uses_a_separate_networkmanager_device() -> None:
     driver = NetworkManagerDriver(None, "/device/sta", "wlP9s9")
     driver._concurrent_ap_sta = True

@@ -1,8 +1,8 @@
 # DGX Spark Onboarding — Build Status
 
 **Overall:** in_progress
-**Current step:** Part B1 — iPhone QR join failed; diagnosing SoftAP association
-**Updated:** 2026-08-02T07:23:00Z
+**Current step:** Part B1 — deploying hardware-identity state repair before retry
+**Updated:** 2026-08-02T07:27:35Z
 
 ## Verification matrix
 
@@ -21,6 +21,8 @@
 - [ ] 8. Hardware networking (`v0.4-hw`)
 
 ## Done since last update
+- Diagnosed the B1 association failure before retrying. The QR decoded to `DGX-Spark-3847`, but `iw` and NetworkManager proved the Spark was broadcasting `DGX-Spark-0001`; the QR PSK hash exactly matched the live AP PSK, and the AP station table was empty. WireGuard did not own the default route: home Wi-Fi remained the default via `192.168.68.1`, the setup AP owned only `10.42.0.0/24`, and WireGuard owned only its explicit `10.8.0.0/24` and `10.184.174.0/26` routes. The VPN was not the association failure.
+- Fixed the durable identity regression: opening an existing state file without an explicit identity now preserves its stored SSID, while hardware startup with the serial-derived SSID repairs stale state without rotating the PSK. This prevents a software reset from replacing a real hardware name with the simulator default and makes reboot self-heal stale identity. Python tests increased to 31 and lint passes.
 - Part B1 join observation: after tapping Join, the operator reported “unable to join neetwork,” interpreted as the iPhone's Unable to Join Network result for `DGX-Spark-3847`. The failure timing was not reported. No association or captive-portal success is inferred.
 - Part B1 first observation: after scanning the temporary hardware Wi-Fi QR, the operator reported that the iPhone was “asking me to join DGX-Spark-3847.” The scan-to-prompt timing was not reported. Joining the network has not yet been attempted or inferred.
 - Part D passes through the real root/software recovery entry because the DGX Spark exposes no provisioning/reset button. The kernel exposes one unnamed 182-line `pinctrl_paris` GPIO controller, while the chassis power control is a separate ACPI `Power Button`; NVIDIA's hardware guide lists only that power button. Guessing an unnamed raw line was rejected. The software reset cleared claim/session data, rotated the AP-password hash, reopened the window, restored the concurrent SoftAP, and preserved the home STA.
@@ -87,7 +89,7 @@
 
 ## Blocked
 - Nothing blocks simulator work.
-- Part B is intentionally proceeding from one-at-a-time observations from the iPhone operator. The B1 join prompt appeared, but tapping Join failed with Unable to Join Network; no association, captive-portal, or later phone outcome has been inferred.
+- Part B is intentionally proceeding from one-at-a-time observations from the iPhone operator. The B1 join prompt appeared, but tapping Join failed because the QR named `DGX-Spark-3847` while stale durable state made the Spark broadcast `DGX-Spark-0001`; no association, captive-portal, or later phone outcome has been inferred.
 - A6 conditions other than wrong PSK remain unrun because this pass has no controllable weak-signal, no-DHCP, no-route, captive-portal, 802.1X, or incompatible-band test networks. Their simulation coverage is not reported as hardware verification.
 - The current custom `DGXSPARK:` enrollment QR contains identity/key material but is not an iOS `WIFI:S:...;T:WPA;P:...;;` join QR. A temporary hardware Wi-Fi QR can validate B1, but the one-scan production enrollment/security UX remains unresolved and must not be represented as finished.
 - No provisioning/reset button or named GPIO line is exposed on this DGX Spark. The GPIO watcher remains simulation-only; the full reset semantics were verified through the root software entry point.
@@ -101,8 +103,9 @@
 - The simulator accepts both documented uppercase `SPARK_SIM_FAIL` error codes and concise aliases. `WIFI_NO_INTERNET` proceeds to LAN-only success by design.
 - The carrier presents only an ACPI power button; the unnamed 182-line SoC GPIO controller is not safe to probe blindly. Hardware reset validation therefore used the root software entry specified by Part D.
 - Avahi alias publication uses `AVAHI_PUBLISH_NO_REVERSE`: the existing `spark-0268.local` name legitimately owns the reverse record for `192.168.68.87`, while the onboarding alias needs only its forward A record.
+- The serial-derived AP SSID is authoritative at hardware startup. An existing state file is migrated to that identity without rotating its PSK; callers that do not provide an identity preserve the existing state's SSID across reset.
 
 ## Next
-- Diagnose the B1 iPhone association failure from the Spark's live NetworkManager and service state before asking the operator to retry.
+- Push and deploy the durable identity repair, restart the Spark service, and verify `iw` broadcasts `DGX-Spark-3847` with the same QR PSK before asking the operator to retry B1.
 - Continue B2-B8 one action and one observation at a time; do not infer or batch phone outcomes.
 - Keep the non-concurrent handoff and unavailable A6 failure classes explicitly simulation-only. Android chooser/reconnect/cache, SoftAP fallback, candidate sweep, manual IP, and Android `.local` failure remain deferred because no Android device exists for this pass.
