@@ -1,8 +1,8 @@
 # DGX Spark Onboarding — Build Status
 
 **Overall:** in_progress
-**Current step:** Part B6 — fresh reset and QR ready; waiting for iPhone QR scan
-**Updated:** 2026-08-02T17:14:10Z
+**Current step:** Part B6 — QR join succeeded silently; reopening expired window
+**Updated:** 2026-08-02T17:32:16Z
 
 ## Verification matrix
 
@@ -21,6 +21,7 @@
 - [ ] 8. Hardware networking (`v0.4-hw`)
 
 ## Done since last update
+- Part B6 QR-join observation: the operator reported “sorry i hit the join - but nothing happend.” Spark-side evidence shows the join did succeed: the iPhone is authenticated, authorized, and associated at about -45 dBm, and DHCP renewed `10.42.0.148`. The absence of visible phone behavior is another manifestation of the already-failed B2 captive auto-open path, not an association failure. The 15-minute window aged to 1,130 seconds during the pause and must be reopened without rotating the still-current QR password.
 - Prepared B6 through the root factory-reset entry. The reset changed the AP-password hash from `c2a7e24f…c0bd4` to `2f99d503…12c7c`, cleared claim/session/owner-token state, restored `DGX-Spark-3847` on channel 6, and preserved the active `Droid_IoT` STA. The service has no warnings. Replaced the temporary Wi-Fi QR at `/Users/amalegaonkar/Desktop/tmp/DGX/dgx-spark-wifi-qr.png`; its decoded password hash matches the live AP exactly, and the secret was not printed.
 - B8 web-UI investigation found the real NVIDIA DGX Dashboard healthy at `127.0.0.1:11000` only; its root returns the DGX Dashboard HTML. The onboarding agent alone owns LAN port 80. The iPhone action therefore cannot reach the dashboard as implemented. Reverse-proxying a deliberately loopback-only administrative surface onto unauthenticated LAN port 80 is rejected as a security regression; B8 `Open Spark web UI` remains failed pending an authenticated integration design.
 - Part B5 iOS Bonjour resolution passes by direct navigation. After entering `http://dgx-spark-3847.local`, the operator reported the Spark page loaded and showed `Setup window closed`, `Try again after reset`, and `Open in Safari`. This proves the iPhone resolved and reached the Spark over home Wi-Fi. It simultaneously confirms the B8 defect: the advertised `Open Spark web UI` destination is the claimed onboarding service, not a post-setup Spark UI, so the action does not deliver the promised next step.
@@ -137,6 +138,6 @@
 - The NVIDIA DGX Dashboard is intentionally loopback-only on this image. The onboarding agent will not proxy it onto unauthenticated LAN port 80 merely to make the success-screen link appear functional.
 
 ## Next
-- Part B6: have the operator scan the freshly replaced Wi-Fi QR and record the exact iOS join prompt before tapping anything.
+- Reopen the expired B6 window through the root software entry without rotating the QR password, verify phone re-association, then use the known manual Safari portal path.
 - Continue B2-B8 one action and one observation at a time; do not infer or batch phone outcomes.
 - Keep the non-concurrent handoff and unavailable A6 failure classes explicitly simulation-only. Android chooser/reconnect/cache, SoftAP fallback, candidate sweep, manual IP, and Android `.local` failure remain deferred because no Android device exists for this pass.
