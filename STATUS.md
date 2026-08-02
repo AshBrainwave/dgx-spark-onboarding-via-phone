@@ -1,8 +1,8 @@
 # DGX Spark Onboarding — Build Status
 
 **Overall:** in_progress
-**Current step:** Part B2 — deploying portal root redirect before Safari reload
-**Updated:** 2026-08-02T07:36:56Z
+**Current step:** Part B2 — portal root fix deployed; waiting for one Safari reload
+**Updated:** 2026-08-02T07:37:56Z
 
 ## Verification matrix
 
@@ -21,6 +21,7 @@
 - [ ] 8. Hardware networking (`v0.4-hw`)
 
 ## Done since last update
+- Deployed `307a842` after the Spark's 32 Python tests and lint passed. On hardware, `GET http://10.42.0.1/` now returns `302 Location: /portal/`, `/portal/` returns successfully, the service has no warnings, and the AP still broadcasts `DGX-Spark-3847`. After the brief service restart, the iPhone automatically re-associated and reclaimed `10.42.0.148`; the operator-facing reload remains unobserved.
 - Fixed the manual portal entry path: `GET /` now explicitly redirects to `/portal/`, while unknown paths on the Spark's own host retain their diagnostic 404 behavior and arbitrary captive hosts still redirect. The new regression test passes; the Mac suite now has 32 passing Python tests and lint passes.
 - B2 manual Safari observation: after opening `http://10.42.0.1/`, the operator reported “got a 404 not found.” The response proves the iPhone reached the Spark's HTTP server over the setup Wi-Fi, but the manual fallback failed because the portal catch-all intentionally returned 404 for unknown paths on the bound AP host—including `/`. The expected manual root redirect was absent.
 - B2 automatic captive-portal result: the operator reported “no portal.” No delay was reported, and the onboarding app did not open automatically after the verified iPhone association. This is a hardware failure of the iOS auto-open requirement; the upcoming explicit Safari check validates only the manual fallback and must not overwrite this result.
@@ -113,6 +114,6 @@
 - The serial-derived AP SSID is authoritative at hardware startup. An existing state file is migrated to that identity without rotating its PSK; callers that do not provide an identity preserve the existing state's SSID across reset.
 
 ## Next
-- Deploy the missing `/` to `/portal/` redirect, verify it from hardware, then ask the operator for one Safari reload.
+- Part B2: have the operator reload the existing Safari page once and record exactly whether the onboarding app renders.
 - Continue B2-B8 one action and one observation at a time; do not infer or batch phone outcomes.
 - Keep the non-concurrent handoff and unavailable A6 failure classes explicitly simulation-only. Android chooser/reconnect/cache, SoftAP fallback, candidate sweep, manual IP, and Android `.local` failure remain deferred because no Android device exists for this pass.
