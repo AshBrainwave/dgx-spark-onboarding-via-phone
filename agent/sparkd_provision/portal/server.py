@@ -21,6 +21,10 @@ def _portal_html() -> str:
     return files("sparkd_provision").joinpath("portal/static/index.html").read_text()
 
 
+async def _portal_root(_: web.Request) -> web.Response:
+    raise web.HTTPFound("/portal/")
+
+
 def create_app(handlers: Handlers) -> web.Application:
     app = web.Application()
 
@@ -61,7 +65,9 @@ def create_app(handlers: Handlers) -> web.Application:
         return web.Response(text=_portal_html(), content_type="text/html")
 
     app.router.add_post("/api/v1", api)
+    app.router.add_get("/", _portal_root)
     app.router.add_get("/portal/", portal)
+
     async def catch_all(request: web.Request) -> web.Response:
         sockname = request.transport.get_extra_info("sockname") if request.transport else None
         bound_host, bound_port = sockname[:2] if sockname else (None, None)

@@ -6,6 +6,7 @@ import struct
 import time
 from pathlib import Path
 
+from aiohttp import web
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 from dbus_fast import Message, MessageType, Variant
 
@@ -39,7 +40,7 @@ from sparkd_provision.net.nm_driver import (
     _unbox,
 )
 from sparkd_provision.portal.dns import answer_a_query
-from sparkd_provision.portal.server import _is_bound_host, _portal_html
+from sparkd_provision.portal.server import _is_bound_host, _portal_html, _portal_root
 from sparkd_provision.protocol.crypto import (
     b64url,
     decrypt_psk,
@@ -525,6 +526,15 @@ def test_captive_catch_all_accepts_default_port_host() -> None:
     assert _is_bound_host("10.42.0.1", "10.42.0.1", 80)
     assert _is_bound_host("10.42.0.1:80", "10.42.0.1", 80)
     assert not _is_bound_host("captive.apple.com", "10.42.0.1", 80)
+
+
+async def test_portal_root_redirects_to_embedded_app() -> None:
+    try:
+        await _portal_root(None)  # type: ignore[arg-type]
+    except web.HTTPFound as response:
+        assert response.location == "/portal/"
+    else:
+        raise AssertionError("portal root did not redirect")
 
 
 def test_embedded_portal_is_self_contained() -> None:
