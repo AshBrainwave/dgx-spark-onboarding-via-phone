@@ -1,14 +1,14 @@
 # DGX Spark Onboarding — Build Status
 
 **Overall:** in_progress
-**Current step:** Part B1/B2 — iPhone reports setup SSID connected; verifying association and portal
-**Updated:** 2026-08-02T07:32:25Z
+**Current step:** Part B2 — waiting for exact captive-portal auto-open observation
+**Updated:** 2026-08-02T07:33:10Z
 
 ## Verification matrix
 
 | Verified on hardware | Verified in simulation only | Deferred (no Android) |
 | --- | --- | --- |
-| Spark aarch64/Python 3.12 portability gate; A1 NetworkManager ownership and AP+STA parser; Wi-Fi/Bluetooth rfkill state; A2 concurrent WPA2 SoftAP visibility/association/DHCP/AP address/NAT/STA preservation/PSK alphabet; A3 captive DNS/HTTP probes/catch-all/embedded portal/startup-shutdown cleanup; A4 forced-scan generation/raw dBm/bars/dedup/bands/6 GHz/security/hidden handling; A5 HTTP X25519/HKDF/AES-GCM join/association/DHCP/status/concurrent-AP preservation; A6 wrong-PSK mapping; A7 Avahi alias/service publication and Mac `.local` resolution; A8 concurrent handoff acknowledgement/AP teardown; A9 online captive-probe responses; Mac CoreBluetooth permission/preflight; BlueZ advertisement/GATT/window lifecycle; BLE central probe C1-C5; systemd boot/SIGKILL recovery; durable state/window/claim/backoff/rate-limit/root-reset lifecycle. | Protocol crypto/framing, mock driver, app FSM/screens/error routes, simulator, non-concurrent handoff recovery, and the GPIO button watcher (no provisioning/reset button is exposed on this Spark). | Chrome Web Bluetooth chooser, user-gesture handling, Location Services prompt, Chrome reconnect/service-cache behaviour, Android SoftAP fallback, Android Chrome `.local` failure, candidate-IP sweep, and manual-IP fallback. |
+| Spark aarch64/Python 3.12 portability gate; A1 NetworkManager ownership and AP+STA parser; Wi-Fi/Bluetooth rfkill state; A2 concurrent WPA2 SoftAP visibility/association/DHCP/AP address/NAT/STA preservation/PSK alphabet; A3 captive DNS/HTTP probes/catch-all/embedded portal/startup-shutdown cleanup; A4 forced-scan generation/raw dBm/bars/dedup/bands/6 GHz/security/hidden handling; A5 HTTP X25519/HKDF/AES-GCM join/association/DHCP/status/concurrent-AP preservation; A6 wrong-PSK mapping; A7 Avahi alias/service publication and Mac `.local` resolution; A8 concurrent handoff acknowledgement/AP teardown; A9 online captive-probe responses; B1 iPhone Wi-Fi QR prompt/one-tap association/DHCP; Mac CoreBluetooth permission/preflight; BlueZ advertisement/GATT/window lifecycle; BLE central probe C1-C5; systemd boot/SIGKILL recovery; durable state/window/claim/backoff/rate-limit/root-reset lifecycle. | Protocol crypto/framing, mock driver, app FSM/screens/error routes, simulator, non-concurrent handoff recovery, and the GPIO button watcher (no provisioning/reset button is exposed on this Spark). | Chrome Web Bluetooth chooser, user-gesture handling, Location Services prompt, Chrome reconnect/service-cache behaviour, Android SoftAP fallback, Android Chrome `.local` failure, candidate-IP sweep, and manual-IP fallback. |
 
 ## Milestones
 - [x] 1. Repo skeleton + CI — clean-clone Python and browser test commands passed
@@ -21,6 +21,7 @@
 - [ ] 8. Hardware networking (`v0.4-hw`)
 
 ## Done since last update
+- B1 passes after the identity fix. The Spark's station table showed the iPhone authenticated, authorized, and associated to `DGX-Spark-3847` at about -50 dBm; NetworkManager's DHCP log recorded DISCOVER/OFFER/REQUEST/ACK and leased `10.42.0.148`. The iPhone continued showing 5G for internet while Settings showed the setup Wi-Fi connected, which is consistent with cellular fallback on a no-internet captive network. Portal auto-open remains a separate B2 observation.
 - Part B1 repaired join observation: the operator reported that iPhone Wi-Fi settings show it connected to `DGX-Spark-3847`, while the status bar still shows 5G rather than the Wi-Fi symbol. Join timing was not reported, and no captive portal was reported yet. This is recorded as the phone-side observation only; Spark-side association and DHCP are being checked before B1 is marked complete.
 - Part B1 repaired retry observation: after scanning the same QR again, the operator reported “ok ready to join?”, confirming the join action is available. Prompt timing was not reported. The operator has not yet reported association or captive-portal behavior.
 - Deployed `7e522ce` from the Mac checkout to the Spark after 31 aarch64 Python tests and lint passed, reinstalled the production package, and restarted the service. The persisted state and live `iw` AP now both report `DGX-Spark-3847`; the live AP password hash still exactly matches the existing QR, channel 6 is active, the default route remains home Wi-Fi, and the service has no warnings. B1 is ready for a controlled retry with the same QR.
@@ -92,7 +93,7 @@
 
 ## Blocked
 - Nothing blocks simulator work.
-- Part B is intentionally proceeding from one-at-a-time observations from the iPhone operator. After the repaired retry, iOS Settings reports association to `DGX-Spark-3847` but the status bar remains on 5G; Spark-side association/DHCP and captive-portal behavior have not yet been inferred.
+- Part B is intentionally proceeding from one-at-a-time observations from the iPhone operator. B1 association and DHCP are verified from both phone and Spark; B2 captive-portal auto-open has not yet been reported or inferred.
 - A6 conditions other than wrong PSK remain unrun because this pass has no controllable weak-signal, no-DHCP, no-route, captive-portal, 802.1X, or incompatible-band test networks. Their simulation coverage is not reported as hardware verification.
 - The current custom `DGXSPARK:` enrollment QR contains identity/key material but is not an iOS `WIFI:S:...;T:WPA;P:...;;` join QR. A temporary hardware Wi-Fi QR can validate B1, but the one-scan production enrollment/security UX remains unresolved and must not be represented as finished.
 - No provisioning/reset button or named GPIO line is exposed on this DGX Spark. The GPIO watcher remains simulation-only; the full reset semantics were verified through the root software entry point.
@@ -109,6 +110,6 @@
 - The serial-derived AP SSID is authoritative at hardware startup. An existing state file is migrated to that identity without rotating its PSK; callers that do not provide an identity preserve the existing state's SSID across reset.
 
 ## Next
-- Verify the reported B1 association and DHCP lease from the Spark, then continue B2 one action at a time if the captive portal did not auto-open.
+- Part B2: record whether iOS automatically opened a captive setup page after joining, including any observed delay; if not, continue with one manual Safari action.
 - Continue B2-B8 one action and one observation at a time; do not infer or batch phone outcomes.
 - Keep the non-concurrent handoff and unavailable A6 failure classes explicitly simulation-only. Android chooser/reconnect/cache, SoftAP fallback, candidate sweep, manual IP, and Android `.local` failure remain deferred because no Android device exists for this pass.
