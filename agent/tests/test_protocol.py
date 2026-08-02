@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
+from dbus_fast import Variant
 
 from sparkd_provision.api.handlers import Handlers
 from sparkd_provision.ble_peripheral import BleProtocolBridge, _decode, _encode
@@ -19,6 +20,7 @@ from sparkd_provision.net.nm_driver import (
     _deduplicate_networks,
     _network_from_properties,
     _ssid_variant,
+    _unbox,
 )
 from sparkd_provision.portal.dns import answer_a_query
 from sparkd_provision.protocol.crypto import (
@@ -402,6 +404,14 @@ def test_captive_dns_answers_any_a_query_with_ap_address() -> None:
     response = answer_a_query(query, b"\xc0\x00\x02\x01")
     assert response is not None
     assert response[-4:] == b"\xc0\x00\x02\x01"
+
+
+def test_networkmanager_nested_variants_are_unboxed() -> None:
+    value = Variant(
+        "aa{sv}",
+        [{"address": Variant("s", "10.42.0.1"), "prefix": Variant("u", 24)}],
+    )
+    assert _unbox(value) == [{"address": "10.42.0.1", "prefix": 24}]
 
 
 def test_wiphy_concurrent_ap_sta_parser_requires_two_interfaces() -> None:

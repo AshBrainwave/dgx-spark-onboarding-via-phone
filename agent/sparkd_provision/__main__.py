@@ -36,6 +36,8 @@ def main() -> None:
 
     async def runtime_app() -> web.Application:
         mdns = None
+        driver = None
+        dns_transport = None
         if args.mock:
             driver = MockDriver()
         else:
@@ -49,33 +51,42 @@ def main() -> None:
                 # Wi-Fi provisioning remains usable if Avahi is not installed; status
                 # is still available through the AP and direct LAN IP.
                 mdns = None
-        handlers = Handlers(driver, state, mdns, serial=identity.serial, model=identity.model)
-        app = create_app(handlers)
-        if not args.mock:
-            dns_transport = await start_dns_responder(ap_address)
-            app["dns_transport"] = dns_transport
+        try:
+            handlers = Handlers(driver, state, mdns, serial=identity.serial, model=identity.model)
+            app = create_app(handlers)
+            if not args.mock:
+                dns_transport = await start_dns_responder(ap_address)
+                app["dns_transport"] = dns_transport
+            if args.reset_gpio_chip is not None:
+                button = GpiodResetButton.create(
+                    args.reset_gpio_chip, args.reset_gpio_line, handlers.factory_reset
+                )
+                button.start()
+                app["reset_button"] = button
 
-            async def close_dns(_: web.Application) -> None:
+                async def close_reset(_: web.Application) -> None:
+                    await button.close()
+
+                app.on_cleanup.append(close_reset)
+            if not args.mock and not args.no_ble:
+                peripheral = await BluezPeripheral.create(handlers, args.bluetooth_adapter)
+                await peripheral.start()
+                # Keep the bus and exported D-Bus objects alive for aiohttp's life.
+                app["ble_peripheral"] = peripheral
+            if not args.mock:
+
+                async def close_hardware(_: web.Application) -> None:
+                    dns_transport.close()
+                    await driver.softap_down()
+
+                app.on_cleanup.append(close_hardware)
+            return app
+        except BaseException:
+            if dns_transport is not None:
                 dns_transport.close()
-
-            app.on_cleanup.append(close_dns)
-        if args.reset_gpio_chip is not None:
-            button = GpiodResetButton.create(
-                args.reset_gpio_chip, args.reset_gpio_line, handlers.factory_reset
-            )
-            button.start()
-            app["reset_button"] = button
-
-            async def close_reset(_: web.Application) -> None:
-                await button.close()
-
-            app.on_cleanup.append(close_reset)
-        if not args.mock and not args.no_ble:
-            peripheral = await BluezPeripheral.create(handlers, args.bluetooth_adapter)
-            await peripheral.start()
-            # Keep the bus and exported D-Bus objects alive for aiohttp's life.
-            app["ble_peripheral"] = peripheral
-        return app
+            if not args.mock and driver is not None:
+                await driver.softap_down()
+            raise
 
     web.run_app(runtime_app(), host=host, port=args.port)
 

@@ -136,6 +136,18 @@ def _variant(signature: str, value: Any) -> Variant:
     return Variant(signature, value)
 
 
+def _unbox(value: Any) -> Any:
+    if isinstance(value, Variant):
+        return _unbox(value.value)
+    if isinstance(value, dict):
+        return {key: _unbox(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_unbox(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_unbox(item) for item in value)
+    return value
+
+
 def _ssid_variant(ssid: str) -> Variant:
     return _variant("ay", ssid.encode())
 
@@ -228,7 +240,7 @@ class NetworkManagerDriver(NetDriver):
 
     async def _properties(self, path: str, interface: str) -> dict[str, Any]:
         values = await self._call(path, PROPERTIES, "GetAll", "s", [interface])
-        return {name: value.value for name, value in values.items()}
+        return {name: _unbox(value) for name, value in values.items()}
 
     @staticmethod
     def _ssid(value: bytes | bytearray | Iterable[int]) -> str:
