@@ -270,6 +270,34 @@ async def discover_target(timeout: float, address: str | None) -> tuple[Any, Any
     return target
 
 
+async def verify_target_absent(timeout: float) -> None:
+    _, BleakScanner, BleakError = _load_bleak()
+    try:
+        discovered = await BleakScanner.discover(timeout=timeout, return_adv=True)
+    except BleakError as exc:
+        raise ProbeError(f"CoreBluetooth scan failed: {exc}") from exc
+    if not discovered:
+        raise ProbeError(
+            "CoreBluetooth found zero BLE devices, so Spark absence cannot be distinguished from missing macOS permission"
+        )
+    target = next(
+        (
+            item
+            for item in discovered.values()
+            if SERVICE_UUID in {uuid.lower() for uuid in item[1].service_uuids}
+            or _advertised_name(*item).startswith("DGX Spark ")
+        ),
+        None,
+    )
+    if target is not None:
+        raise ProbeError(
+            f"Spark is still advertising as {_advertised_name(*target)!r} after provisioning closed"
+        )
+    print(
+        f"PASS D BLE closed: CoreBluetooth saw {len(discovered)} other BLE device(s) and no DGX Spark advertiser"
+    )
+
+
 def verify_advertisement(device: Any, advertisement: Any) -> None:
     uuids = {uuid.lower() for uuid in advertisement.service_uuids}
     name = _advertised_name(device, advertisement)
@@ -321,6 +349,9 @@ async def run_probe(args: argparse.Namespace) -> None:
         raise ProbeError("--rate-limit-test requires --provision")
     if args.claim and not args.provision:
         raise ProbeError("--claim requires --provision")
+    if args.expect_absent:
+        await verify_target_absent(args.scan_timeout)
+        return
     BleakClient, _, BleakError = _load_bleak()
     device, advertisement = await discover_target(args.scan_timeout, args.address)
     verify_advertisement(device, advertisement)
@@ -613,6 +644,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--scan-only", action="store_true", help="stop after advertising validation"
+    )
+    parser.add_argument(
+        "--expect-absent",
+        action="store_true",
+        help="pass only when Bluetooth works but the Spark is not advertising",
     )
     parser.add_argument("--address", help="CoreBluetooth device UUID from a prior scan")
     parser.add_argument("--scan-timeout", type=float, default=10)

@@ -199,6 +199,7 @@ class BluezPeripheral:
         self.bus, self.adapter, self.handlers = bus, adapter, handlers
         self.tx = _TxCharacteristic()
         self.bridge = BleProtocolBridge(handlers, self.tx.notify)
+        self.advertising = False
 
     @classmethod
     async def create(cls, handlers: Handlers, adapter: str = "/org/bluez/hci0") -> "BluezPeripheral":
@@ -213,13 +214,36 @@ class BluezPeripheral:
         self.bus.export(ROOT + "/service0/char2", _InfoCharacteristic(self.handlers))
         self.bus.export(ROOT + "/advertisement0", _Advertisement(f"DGX Spark {last4}"))
         await self._call("org.bluez.GattManager1", "RegisterApplication", "oa{sv}", [ROOT, {}])
-        await self._call("org.bluez.LEAdvertisingManager1", "RegisterAdvertisement", "oa{sv}", [ROOT + "/advertisement0", {}])
+        await self._sync_advertisement()
         asyncio.create_task(self._expiry_loop())
 
     async def _expiry_loop(self) -> None:
         while True:
             await asyncio.sleep(1)
             await self.bridge.expire()
+            try:
+                await self._sync_advertisement()
+            except RuntimeError:
+                # BlueZ can be briefly busy during adapter or connection state
+                # transitions. Keep the expiry loop alive and retry next tick.
+                pass
+
+    async def _sync_advertisement(self) -> None:
+        desired = (
+            self.handlers.state.provisioning_open
+            and not self.handlers.state.state.claimed
+        )
+        if desired == self.advertising:
+            return
+        member = "RegisterAdvertisement" if desired else "UnregisterAdvertisement"
+        signature = "oa{sv}" if desired else "o"
+        body: list[Any] = (
+            [ROOT + "/advertisement0", {}]
+            if desired
+            else [ROOT + "/advertisement0"]
+        )
+        await self._call("org.bluez.LEAdvertisingManager1", member, signature, body)
+        self.advertising = desired
 
     async def _call(self, interface: str, member: str, signature: str, body: list[Any]) -> None:
         reply = await self.bus.call(Message(destination=BLUEZ, path=self.adapter, interface=interface, member=member, signature=signature, body=body))

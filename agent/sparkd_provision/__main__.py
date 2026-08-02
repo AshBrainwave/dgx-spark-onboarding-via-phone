@@ -44,7 +44,11 @@ def main() -> None:
             # This check intentionally happens before touching the interface when
             # NetworkManager does not own it; do not fight netplan or another manager.
             driver = await NetworkManagerDriver.create(args.interface)
-            ap_address = await driver.softap_up(state.state.ap_ssid, state.state.ap_psk)
+            ap_address = None
+            if not state.state.claimed:
+                ap_address = await driver.softap_up(
+                    state.state.ap_ssid, state.state.ap_psk
+                )
             try:
                 mdns = await MdnsPublisher.create()
             except (OSError, RuntimeError):
@@ -54,7 +58,7 @@ def main() -> None:
         try:
             handlers = Handlers(driver, state, mdns, serial=identity.serial, model=identity.model)
             app = create_app(handlers)
-            if not args.mock:
+            if not args.mock and ap_address:
                 dns_transport = await start_dns_responder(ap_address)
                 app["dns_transport"] = dns_transport
             if args.reset_gpio_chip is not None:
@@ -76,7 +80,8 @@ def main() -> None:
             if not args.mock:
 
                 async def close_hardware(_: web.Application) -> None:
-                    dns_transport.close()
+                    if dns_transport is not None:
+                        dns_transport.close()
                     await driver.softap_down()
 
                 app.on_cleanup.append(close_hardware)

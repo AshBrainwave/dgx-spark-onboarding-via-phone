@@ -10,7 +10,13 @@ from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 from dbus_fast import Message, MessageType, Variant
 
 from sparkd_provision.api.handlers import Handlers
-from sparkd_provision.ble_peripheral import BleProtocolBridge, _decode, _encode
+from sparkd_provision.ble_peripheral import (
+    ROOT,
+    BleProtocolBridge,
+    BluezPeripheral,
+    _decode,
+    _encode,
+)
 from sparkd_provision.config import DeviceIdentity
 from sparkd_provision.net import mock_driver
 from sparkd_provision.net.capabilities import supports_concurrent_ap_sta
@@ -196,6 +202,35 @@ async def test_ble_bridge_decodes_handles_and_frames_response() -> None:
         response = reassembler.add(frame) or response
     assert response is not None
     assert _decode(response[1])["body"]["serial"] == "SIM-0001"
+
+
+async def test_ble_advertising_follows_persisted_provisioning_state(tmp_path) -> None:
+    handlers = Handlers(MockDriver(), StateStore(tmp_path / "state.json"))
+    peripheral = BluezPeripheral.__new__(BluezPeripheral)
+    peripheral.handlers = handlers
+    peripheral.advertising = False
+    calls = []
+
+    async def call(interface, member, signature, body):
+        calls.append((interface, member, signature, body))
+
+    peripheral._call = call
+
+    await peripheral._sync_advertisement()
+    assert peripheral.advertising is True
+    handlers.state.claim("owner")
+    await peripheral._sync_advertisement()
+    assert peripheral.advertising is False
+    assert calls[0][1:] == (
+        "RegisterAdvertisement",
+        "oa{sv}",
+        [ROOT + "/advertisement0", {}],
+    )
+    assert calls[1][1:] == (
+        "UnregisterAdvertisement",
+        "o",
+        [ROOT + "/advertisement0"],
+    )
 
 
 def test_shared_contract_fixtures_have_valid_envelopes() -> None:
