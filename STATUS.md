@@ -1,8 +1,8 @@
 # DGX Spark Onboarding — Build Status
 
 **Overall:** in_progress
-**Current step:** Part B4 — Connect exposed simulator SSID; diagnosing session and UI identity
-**Updated:** 2026-08-02T07:40:59Z
+**Current step:** Part B4 — deploying expired-session recovery fix and reopening hardware window
+**Updated:** 2026-08-02T07:43:30Z
 
 ## Verification matrix
 
@@ -21,6 +21,7 @@
 - [ ] 8. Hardware networking (`v0.4-hw`)
 
 ## Done since last update
+- Confirmed why B4 Connect entered recovery: the persisted provisioning window was 4,459 seconds old, so the 15-minute anti-drive-by guard correctly rejected the session as `SESSION_EXPIRED`. Fixed the separate UI defect: production join recovery no longer invents simulator SSID/password values, and session expiry now offers `Try again after reset` instead of routing to join instructions. The rebuilt embedded portal contains neither `DGX-Spark-0001` nor `SparkSim2345`; 10 browser tests, typecheck, portal build, 32 Python tests, and Python lint pass.
 - B4 first Connect observation: after tapping `Connect`, the operator reported “it says to join Spark-0001” instead of seeing a Wi-Fi scan list. No additional phone action or outcome is inferred. Source inspection confirms the join-instructions component still has baked simulator defaults `DGX-Spark-0001` / `SparkSim2345`; production must never present those values.
 - B2 manual fallback passes after the root-route fix. The operator reported “i see the portal - connect and open in safari,” confirming that the iPhone rendered the embedded onboarding app and exposed both the `Connect` control and `Open in Safari` escape hatch. This does not repair or validate automatic CNA opening, which failed; because the view was opened manually in Safari, CNA-specific B3 behavior remains unverified.
 - Deployed `307a842` after the Spark's 32 Python tests and lint passed. On hardware, `GET http://10.42.0.1/` now returns `302 Location: /portal/`, `/portal/` returns successfully, the service has no warnings, and the AP still broadcasts `DGX-Spark-3847`. After the brief service restart, the iPhone automatically re-associated and reclaimed `10.42.0.148`; the operator-facing reload remains unobserved.
@@ -116,6 +117,6 @@
 - The serial-derived AP SSID is authoritative at hardware startup. An existing state file is migrated to that identity without rotating its PSK; callers that do not provide an identity preserve the existing state's SSID across reset.
 
 ## Next
-- Diagnose whether the B4 Connect path first hit session expiry, then remove simulator credentials from the production join path before asking the operator to continue.
+- Deploy the production recovery UI, reopen the expired hardware window through the validated root software entry without rotating the QR PSK, and verify the phone re-associates before one reload.
 - Continue B2-B8 one action and one observation at a time; do not infer or batch phone outcomes.
 - Keep the non-concurrent handoff and unavailable A6 failure classes explicitly simulation-only. Android chooser/reconnect/cache, SoftAP fallback, candidate sweep, manual IP, and Android `.local` failure remain deferred because no Android device exists for this pass.
