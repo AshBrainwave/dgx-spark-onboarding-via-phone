@@ -133,6 +133,7 @@ class _TxCharacteristic(ServiceInterface):
     def __init__(self) -> None:
         super().__init__("org.bluez.GattCharacteristic1")
         self.notifying = False
+        self.value = b""
 
     @method()
     def StartNotify(self) -> None:
@@ -158,9 +159,14 @@ class _TxCharacteristic(ServiceInterface):
     def Notifying(self) -> "b":
         return self.notifying
 
+    @dbus_property(access=PropertyAccess.READ)
+    def Value(self) -> "ay":
+        return self.value
+
     async def notify(self, frame: bytes) -> None:
         if self.notifying:
-            self.emit_properties_changed({"Value": bytes(frame)})
+            self.value = bytes(frame)
+            self.emit_properties_changed({"Value": self.value})
 
 
 class _InfoCharacteristic(ServiceInterface):
