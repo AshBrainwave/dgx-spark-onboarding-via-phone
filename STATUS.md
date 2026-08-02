@@ -1,8 +1,8 @@
 # DGX Spark Onboarding — Build Status
 
 **Overall:** in_progress
-**Current step:** Part B8 — iOS `.local` passes; web-UI target reaches expired onboarding app
-**Updated:** 2026-08-02T17:11:38Z
+**Current step:** Part B6 — B8 web-UI action failed safely; preparing wrong-password run
+**Updated:** 2026-08-02T17:12:56Z
 
 ## Verification matrix
 
@@ -21,6 +21,7 @@
 - [ ] 8. Hardware networking (`v0.4-hw`)
 
 ## Done since last update
+- B8 web-UI investigation found the real NVIDIA DGX Dashboard healthy at `127.0.0.1:11000` only; its root returns the DGX Dashboard HTML. The onboarding agent alone owns LAN port 80. The iPhone action therefore cannot reach the dashboard as implemented. Reverse-proxying a deliberately loopback-only administrative surface onto unauthenticated LAN port 80 is rejected as a security regression; B8 `Open Spark web UI` remains failed pending an authenticated integration design.
 - Part B5 iOS Bonjour resolution passes by direct navigation. After entering `http://dgx-spark-3847.local`, the operator reported the Spark page loaded and showed `Setup window closed`, `Try again after reset`, and `Open in Safari`. This proves the iPhone resolved and reached the Spark over home Wi-Fi. It simultaneously confirms the B8 defect: the advertised `Open Spark web UI` destination is the claimed onboarding service, not a post-setup Spark UI, so the action does not deliver the promised next step.
 - Part B5 address-bar observation: the operator reported “10..,” confirming Safari remained on the old `10.42.0.1` setup origin after `Open Spark web UI` was tapped. The control therefore did not produce observable navigation. This does not test `.local` resolution; a direct address-bar request is required to isolate link behavior from Bonjour resolution.
 - Part B5 first `.local` link observation: after tapping `Open Spark web UI`, the operator reported “notthing.. but it feels like it is trying 10.42.0.1.” No visible navigation or resolved page was observed, so the iOS `.local` requirement and B8 web-UI action remain failed/unconfirmed. Concurrent checks still show `dgx-spark-3847.local -> 192.168.68.87` in macOS host resolution and `avahi-resolve-host-name`, with the Spark service listening on LAN port 80; macOS CLI curl resolution timed out despite the cached host result, consistent with the already-recorded Mac network-extension artifact but not evidence about iOS.
@@ -132,8 +133,9 @@
 - Avahi alias publication uses `AVAHI_PUBLISH_NO_REVERSE`: the existing `spark-0268.local` name legitimately owns the reverse record for `192.168.68.87`, while the onboarding alias needs only its forward A record.
 - The serial-derived AP SSID is authoritative at hardware startup. An existing state file is migrated to that identity without rotating its PSK; callers that do not provide an identity preserve the existing state's SSID across reset.
 - Captive-portal cryptography cannot depend on secure-context-only Web Crypto because the AP deliberately serves plain HTTP. The portal uses audited pure-JavaScript primitives for the same X25519/HKDF-SHA256/AES-256-GCM wire protocol; weakening or removing application-layer PSK encryption is rejected.
+- The NVIDIA DGX Dashboard is intentionally loopback-only on this image. The onboarding agent will not proxy it onto unauthenticated LAN port 80 merely to make the success-screen link appear functional.
 
 ## Next
-- Identify whether this Spark exposes a real LAN web UI that the B8 control can target; if none exists, keep B8 failed rather than relabeling the onboarding portal as a management UI, then prepare the one-at-a-time B6 failure-recovery run.
+- Prepare B6 through the validated root factory-reset entry, rotate the setup PSK, generate a fresh temporary Wi-Fi QR without exposing the secret, then repeat the iPhone flow one action at a time with a deliberately wrong home password.
 - Continue B2-B8 one action and one observation at a time; do not infer or batch phone outcomes.
 - Keep the non-concurrent handoff and unavailable A6 failure classes explicitly simulation-only. Android chooser/reconnect/cache, SoftAP fallback, candidate sweep, manual IP, and Android `.local` failure remain deferred because no Android device exists for this pass.
