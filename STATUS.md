@@ -1,14 +1,14 @@
 # DGX Spark Onboarding — Build Status
 
 **Overall:** in_progress
-**Current step:** Part A5 — encrypted API join to a real network
-**Updated:** 2026-08-02T00:33:38Z
+**Current step:** Part A6 — map real NetworkManager failures
+**Updated:** 2026-08-02T00:38:34Z
 
 ## Verification matrix
 
 | Verified on hardware | Verified in simulation only | Deferred (no Android) |
 | --- | --- | --- |
-| Spark aarch64/Python 3.12 portability gate; A1 NetworkManager ownership and AP+STA parser; Wi-Fi/Bluetooth rfkill state; A2 concurrent WPA2 SoftAP visibility/association/DHCP/AP address/NAT/STA preservation/PSK alphabet; A3 captive DNS/HTTP probes/catch-all/embedded portal/startup-shutdown cleanup; A4 forced-scan generation/raw dBm/bars/dedup/bands/6 GHz/security/hidden handling; Mac CoreBluetooth permission/preflight. | Protocol crypto/framing, mock driver, app FSM/screens/error routes, simulator, BlueZ bridge, mDNS publisher, handoff recovery, lifecycle/reset logic, BLE central probe framing/codec self-test. | Chrome Web Bluetooth chooser, user-gesture handling, Location Services prompt, Chrome reconnect/service-cache behaviour, and Android SoftAP fallback/`.local` resolution. |
+| Spark aarch64/Python 3.12 portability gate; A1 NetworkManager ownership and AP+STA parser; Wi-Fi/Bluetooth rfkill state; A2 concurrent WPA2 SoftAP visibility/association/DHCP/AP address/NAT/STA preservation/PSK alphabet; A3 captive DNS/HTTP probes/catch-all/embedded portal/startup-shutdown cleanup; A4 forced-scan generation/raw dBm/bars/dedup/bands/6 GHz/security/hidden handling; A5 HTTP X25519/HKDF/AES-GCM join/association/DHCP/status/concurrent-AP preservation; Mac CoreBluetooth permission/preflight. | Protocol crypto/framing, mock driver, app FSM/screens/error routes, simulator, BlueZ bridge, mDNS publisher, handoff recovery, lifecycle/reset logic, BLE central probe framing/codec self-test. | Chrome Web Bluetooth chooser, user-gesture handling, Location Services prompt, Chrome reconnect/service-cache behaviour, and Android SoftAP fallback/`.local` resolution. |
 
 ## Milestones
 - [x] 1. Repo skeleton + CI — clean-clone Python and browser test commands passed
@@ -21,6 +21,8 @@
 - [ ] 8. Hardware networking (`v0.4-hw`)
 
 ## Done since last update
+- A5 passes on hardware: the Mac opened a real X25519/HKDF session, asserted that the WPA2 password was absent from the serialized request, and sent only AES-GCM ciphertext. NetworkManager deauthenticated and reassociated `wlP9s9` to `Droid_IoT`, completed WPA key negotiation and a fresh DHCP transaction, and activated persisted profile `DGX provisioning Droid_IoT` (`163eb85c-a546-44f4-a6d0-6a175a2170de`). The API reported `online`, IP `192.168.68.87`, gateway `192.168.68.1`, DNS `75.75.75.75`, and RSSI -70; `wlP9s9-ap` remained active on channel 6. The guarded recovery timer was cancelled.
+- The first A5 session correctly returned `SESSION_EXPIRED` because the 15-minute provisioning window had elapsed; no credential or radio mutation occurred. Added and tested `StateStore.reopen()` (`84fded6`) so the physical-button/software-entry path can extend the window without rotating the AP password. The persisted window was reopened through that API before the successful retry; full reset/rotation remains Part D.
 - A4 passes on hardware at `4365ea2`: a forced D-Bus scan advanced `LastScan` from 82,385,591 to 82,399,790 and completed in 1.54 seconds. The normalized result contained 37 entries (18 named, 19 hidden); 29 retained BSSIDs had kernel scan-cache measurements and every reported integer dBm matched the kernel value exactly with zero mismatches. `Droid` deduped 2.4/5/6 GHz at -59 dBm; `Droid_Guest_6GHz` was WPA3/6 GHz; `Xfinity Mobile` was explicitly unsupported 802.1X; and `xfinitywifi` was open.
 - Fixed A4's last simulation artifact (`4365ea2`): forced scans now wait for NetworkManager's `LastScan` generation to advance, then join the D-Bus security/frequency metadata to nl80211 `iw scan dump` signal measurements by BSSID. NetworkManager quality conversion remains only a fallback when a BSSID is absent from the kernel cache. Mac and Spark lint plus all 23 Python tests pass.
 - A3 passes from the Mac as a real AP client at `31c6371`: the agent owns `10.42.0.1:53/udp` and `0.0.0.0:80/tcp`, while NetworkManager's shared `dnsmasq` retains DHCP/NAT. A raw DNS query bound to macOS `en0` returned `10.42.0.1`; Spark `tcpdump` captured request and response. Apple, Android, Windows, and arbitrary-host probes returned 302 to `/portal/`; `/portal/` returned the embedded app; and an unknown path with the AP's own Host returned 404.
@@ -74,7 +76,7 @@
 ## Blocked
 - Nothing blocks simulator work.
 - Spark-side BLE advertising/GATT validation requires the agent to be deployed and advertising. The Mac side is ready and its CoreBluetooth permission is verified; no Android device is needed for Part C.
-- Real join/error mapping, mDNS, and handoff behavior remain unrun on hardware.
+- Real error mapping, mDNS, and handoff behavior remain unrun on hardware.
 - The physical reset implementation needs the Spark carrier-board GPIO chip/line and an actual button press for validation. Real BlueZ advertising/GATT, AP recovery, Avahi publishing, and mutating D-Bus networking validation remain unrun.
 
 ## Decisions I made that the spec didn't cover
@@ -86,7 +88,7 @@
 - The simulator accepts both documented uppercase `SPARK_SIM_FAIL` error codes and concise aliases. `WIFI_NO_INTERNET` proceeds to LAN-only success by design.
 
 ## Next
-- On the Spark/Mac: validate an encrypted real join, error mappings, Avahi, and the concurrent handoff path (Part A).
+- On the Spark/Mac: validate real NetworkManager error mappings, Avahi, and the concurrent handoff path (Part A).
 - On the Mac: run the reusable BLE central probe against the Spark; defer only Android browser-layer validation.
 - Validate the non-concurrent recovery client on hardware: mDNS status polling, Android candidate-IP sweep/manual-IP fallback, and AP restoration within 20 seconds after every join failure (Priority 8).
 - Validate the configured physical-reset GPIO button and systemd first-boot/state recovery/claim-lock/rate-limit behavior on the Spark (Priority 9).
