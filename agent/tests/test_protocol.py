@@ -518,6 +518,18 @@ async def test_factory_reset_reopens_window_rotates_ap_and_restores_recovery_ap(
     assert state_path.stat().st_mode & 0o777 == 0o600
 
 
+def test_reopen_extends_window_without_rotating_ap_password(tmp_path) -> None:
+    state = StateStore(tmp_path / "state.json")
+    password = state.state.ap_psk
+    state.state.provision_opened_at = "2020-01-01T00:00:00+00:00"
+    state.save()
+
+    state.reopen()
+
+    assert state.provisioning_open
+    assert state.state.ap_psk == password
+
+
 async def test_existing_management_wifi_does_not_flip_captive_probes_online() -> None:
     driver = MockDriver()
     driver._status = LinkStatus(phase="online", ssid="management", ip="192.168.68.87")

@@ -53,6 +53,10 @@ class StateStore:
         )
         self.save()
 
+    def reopen(self) -> None:
+        self.state.provision_opened_at = datetime.now(UTC).isoformat()
+        self.save()
+
     @staticmethod
     def _ap_password() -> str:
         alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
