@@ -19,10 +19,19 @@ class MdnsPublisher:
     async def create(cls) -> MdnsPublisher:
         return cls(await MessageBus(bus_type=BusType.SYSTEM).connect())
 
-    async def publish(self, name: str, hostname: str, port: int = 8080) -> None:
+    async def publish(
+        self, name: str, hostname: str, address: str, port: int = 80
+    ) -> None:
         if self.published:
             return
         group = await self._call("/", AVAHI_SERVER, "EntryGroupNew")
+        await self._call(
+            group,
+            AVAHI_GROUP,
+            "AddAddress",
+            "iiuss",
+            [-1, -1, 0, hostname, address],
+        )
         await self._call(
             group,
             AVAHI_GROUP,

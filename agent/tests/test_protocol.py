@@ -15,6 +15,7 @@ from sparkd_provision.config import DeviceIdentity
 from sparkd_provision.net import mock_driver
 from sparkd_provision.net.capabilities import supports_concurrent_ap_sta
 from sparkd_provision.net.driver import LinkStatus
+from sparkd_provision.net.mdns import AVAHI_GROUP, AVAHI_SERVER, MdnsPublisher
 from sparkd_provision.net.mock_driver import MockDriver
 from sparkd_provision.net.nm_driver import (
     NetworkManagerDriver,
@@ -537,6 +538,50 @@ async def test_factory_reset_reopens_window_rotates_ap_and_restores_recovery_ap(
     assert state.state.ap_psk != old_password
     assert driver.ap_up_calls == 1
     assert state_path.stat().st_mode & 0o777 == 0o600
+
+
+async def test_mdns_publishes_resolvable_alias_on_production_port() -> None:
+    calls = []
+
+    async def call(path, interface, member, signature="", body=None):
+        calls.append((path, interface, member, signature, body))
+        return "/Client1/EntryGroup1" if member == "EntryGroupNew" else None
+
+    publisher = MdnsPublisher(None)  # type: ignore[arg-type]
+    publisher._call = call  # type: ignore[method-assign]
+
+    await publisher.publish(
+        "DGX Spark", "dgx-spark-3847.local", "192.168.68.87"
+    )
+
+    assert calls == [
+        ("/", AVAHI_SERVER, "EntryGroupNew", "", None),
+        (
+            "/Client1/EntryGroup1",
+            AVAHI_GROUP,
+            "AddAddress",
+            "iiuss",
+            [-1, -1, 0, "dgx-spark-3847.local", "192.168.68.87"],
+        ),
+        (
+            "/Client1/EntryGroup1",
+            AVAHI_GROUP,
+            "AddService",
+            "iiussssqaay",
+            [
+                -1,
+                -1,
+                0,
+                "DGX Spark",
+                "_dgx-spark._tcp",
+                "local",
+                "dgx-spark-3847.local",
+                80,
+                [],
+            ],
+        ),
+        ("/Client1/EntryGroup1", AVAHI_GROUP, "Commit", "", None),
+    ]
 
 
 def test_reopen_extends_window_without_rotating_ap_password(tmp_path) -> None:

@@ -130,11 +130,13 @@ class Handlers:
             return response(message_id, {"accepted": True, "handoff": handoff or None})
         if op == "wifi.status":
             status = await self.driver.status()
-            if status.phase == "online" and self.mdns:
+            if status.phase == "online" and status.ip and self.mdns:
                 # Avahi owns conflict handling; a failed publisher must not make a
                 # successfully provisioned device appear to have failed Wi-Fi.
                 try:
-                    await self.mdns.publish("DGX Spark", f"{self.hostname}.local")
+                    await self.mdns.publish(
+                        "DGX Spark", f"{self.hostname}.local", status.ip
+                    )
                 except RuntimeError:
                     pass
             if status.phase == "failed":
