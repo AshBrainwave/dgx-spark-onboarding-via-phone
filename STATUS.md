@@ -1,8 +1,8 @@
 # DGX Spark Onboarding — Build Status
 
 **Overall:** in_progress
-**Current step:** Part B5 — web-UI link produced no visible navigation; identifying exact URL
-**Updated:** 2026-08-02T17:07:40Z
+**Current step:** Part B5 — Safari remained on setup IP; waiting for direct `.local` navigation
+**Updated:** 2026-08-02T17:09:01Z
 
 ## Verification matrix
 
@@ -21,6 +21,7 @@
 - [ ] 8. Hardware networking (`v0.4-hw`)
 
 ## Done since last update
+- Part B5 address-bar observation: the operator reported “10..,” confirming Safari remained on the old `10.42.0.1` setup origin after `Open Spark web UI` was tapped. The control therefore did not produce observable navigation. This does not test `.local` resolution; a direct address-bar request is required to isolate link behavior from Bonjour resolution.
 - Part B5 first `.local` link observation: after tapping `Open Spark web UI`, the operator reported “notthing.. but it feels like it is trying 10.42.0.1.” No visible navigation or resolved page was observed, so the iOS `.local` requirement and B8 web-UI action remain failed/unconfirmed. Concurrent checks still show `dgx-spark-3847.local -> 192.168.68.87` in macOS host resolution and `avahi-resolve-host-name`, with the Spark service listening on LAN port 80; macOS CLI curl resolution timed out despite the cached host result, consistent with the already-recorded Mac network-extension artifact but not evidence about iOS.
 - Part B5 claim/handoff passes. After tapping `Finish setup`, the operator reported that the page remained as-is and a Wi-Fi symbol appeared on the iPhone. Spark state persisted `claimed=true`, the owner-token hash, and name `DGX Spark`; NetworkManager removed the provisioning AP profile/interface at 17:03:26Z, BlueZ ActiveInstances fell to zero, while `Droid_IoT`, service, home IP `192.168.68.87`, and SSH remained active. The operator did not report an exact phone-side delay. iOS `.local` resolution remains the next B5 check.
 - Part B4 full provisioning passes on iPhone. After encrypted local credential submission, the operator reported “spark is online” and a success screen with an IP plus `Copy SSH`, `Open Spark web UI`, `Finish setup`, and `Open in Safari`. Spark logs show the real `Droid_IoT` transition through scan, authenticate, associate, four-way handshake, DHCP, and activation; it returned online at `192.168.68.87` while `DGX-Spark-3847` and the iPhone association stayed active. Submission-to-NetworkManager activation took about 16.4 seconds. The operator did not report the intermediate Applying labels or the exact displayed IP, so those visual details are not claimed.
@@ -132,6 +133,6 @@
 - Captive-portal cryptography cannot depend on secure-context-only Web Crypto because the AP deliberately serves plain HTTP. The portal uses audited pure-JavaScript primitives for the same X25519/HKDF-SHA256/AES-256-GCM wire protocol; weakening or removing application-layer PSK encryption is rejected.
 
 ## Next
-- Part B5: have the operator expose Safari's address bar without navigating and report the exact current or attempted URL before a direct `.local` test.
+- Part B5: have the operator directly navigate Safari to `http://dgx-spark-3847.local` and record the exact page or error, isolating iOS Bonjour resolution from the failed in-page link.
 - Continue B2-B8 one action and one observation at a time; do not infer or batch phone outcomes.
 - Keep the non-concurrent handoff and unavailable A6 failure classes explicitly simulation-only. Android chooser/reconnect/cache, SoftAP fallback, candidate sweep, manual IP, and Android `.local` failure remain deferred because no Android device exists for this pass.
