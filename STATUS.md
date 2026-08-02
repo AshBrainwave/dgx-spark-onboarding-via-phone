@@ -1,8 +1,8 @@
 # DGX Spark Onboarding — Build Status
 
 **Overall:** in_progress
-**Current step:** Part B3/B4 — manual Safari portal rendered; waiting for Connect
-**Updated:** 2026-08-02T07:38:48Z
+**Current step:** Part B4 — Connect exposed simulator SSID; diagnosing session and UI identity
+**Updated:** 2026-08-02T07:40:59Z
 
 ## Verification matrix
 
@@ -21,6 +21,7 @@
 - [ ] 8. Hardware networking (`v0.4-hw`)
 
 ## Done since last update
+- B4 first Connect observation: after tapping `Connect`, the operator reported “it says to join Spark-0001” instead of seeing a Wi-Fi scan list. No additional phone action or outcome is inferred. Source inspection confirms the join-instructions component still has baked simulator defaults `DGX-Spark-0001` / `SparkSim2345`; production must never present those values.
 - B2 manual fallback passes after the root-route fix. The operator reported “i see the portal - connect and open in safari,” confirming that the iPhone rendered the embedded onboarding app and exposed both the `Connect` control and `Open in Safari` escape hatch. This does not repair or validate automatic CNA opening, which failed; because the view was opened manually in Safari, CNA-specific B3 behavior remains unverified.
 - Deployed `307a842` after the Spark's 32 Python tests and lint passed. On hardware, `GET http://10.42.0.1/` now returns `302 Location: /portal/`, `/portal/` returns successfully, the service has no warnings, and the AP still broadcasts `DGX-Spark-3847`. After the brief service restart, the iPhone automatically re-associated and reclaimed `10.42.0.148`; the operator-facing reload remains unobserved.
 - Fixed the manual portal entry path: `GET /` now explicitly redirects to `/portal/`, while unknown paths on the Spark's own host retain their diagnostic 404 behavior and arbitrary captive hosts still redirect. The new regression test passes; the Mac suite now has 32 passing Python tests and lint passes.
@@ -98,7 +99,7 @@
 
 ## Blocked
 - Nothing blocks simulator work.
-- Part B is intentionally proceeding from one-at-a-time observations from the iPhone operator. B1 passes; B2 auto-open failed but the repaired manual Safari fallback renders. CNA-specific B3 constraints cannot be claimed from a Safari view and remain unverified.
+- Part B is intentionally proceeding from one-at-a-time observations from the iPhone operator. B1 passes; B2 auto-open failed but the repaired manual Safari fallback renders; B4 Connect did not reach the network list and instead exposed a baked `Spark-0001` join identity. CNA-specific B3 constraints remain unverified.
 - A6 conditions other than wrong PSK remain unrun because this pass has no controllable weak-signal, no-DHCP, no-route, captive-portal, 802.1X, or incompatible-band test networks. Their simulation coverage is not reported as hardware verification.
 - The current custom `DGXSPARK:` enrollment QR contains identity/key material but is not an iOS `WIFI:S:...;T:WPA;P:...;;` join QR. A temporary hardware Wi-Fi QR can validate B1, but the one-scan production enrollment/security UX remains unresolved and must not be represented as finished.
 - No provisioning/reset button or named GPIO line is exposed on this DGX Spark. The GPIO watcher remains simulation-only; the full reset semantics were verified through the root software entry point.
@@ -115,6 +116,6 @@
 - The serial-derived AP SSID is authoritative at hardware startup. An existing state file is migrated to that identity without rotating its PSK; callers that do not provide an identity preserve the existing state's SSID across reset.
 
 ## Next
-- Part B4: have the operator tap `Connect` and record exactly whether the real Wi-Fi scan list renders or an error appears.
+- Diagnose whether the B4 Connect path first hit session expiry, then remove simulator credentials from the production join path before asking the operator to continue.
 - Continue B2-B8 one action and one observation at a time; do not infer or batch phone outcomes.
 - Keep the non-concurrent handoff and unavailable A6 failure classes explicitly simulation-only. Android chooser/reconnect/cache, SoftAP fallback, candidate sweep, manual IP, and Android `.local` failure remain deferred because no Android device exists for this pass.
