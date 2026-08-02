@@ -1,8 +1,8 @@
 # DGX Spark Onboarding — Build Status
 
 **Overall:** in_progress
-**Current step:** Part B4 — browser crypto fix deployed; waiting for portal reload
-**Updated:** 2026-08-02T16:56:02Z
+**Current step:** Part B4 — compatibility build loaded; waiting for Connect retry
+**Updated:** 2026-08-02T16:57:04Z
 
 ## Verification matrix
 
@@ -21,6 +21,7 @@
 - [ ] 8. Hardware networking (`v0.4-hw`)
 
 ## Done since last update
+- Part B4 compatibility-page observation: after reloading, the operator reported “connectAND OPEN IN safari,” confirming the refreshed portal again shows `Connect` and `Open in Safari`. At verification the iPhone remained authorized/associated and the setup window was 533 seconds old, leaving about six minutes; the Connect outcome is not inferred.
 - Deployed `4eaaea5` after the Spark's 32 Python tests and lint passed. The production service and `DGX-Spark-3847` AP returned cleanly; the setup window was 457 seconds old, leaving roughly seven minutes. The iPhone automatically re-associated, authenticated, and renewed `10.42.0.148`. The operator-facing pure-JavaScript crypto path has not yet been rerun.
 - Replaced the portal's secure-context-only `crypto.subtle` dependency with audited, browser-native JavaScript primitives from Noble: X25519, HKDF-SHA256, and AES-256-GCM. The byte-level protocol is unchanged: existing Python-produced vectors still match exactly, SSID remains AES-GCM AAD, and the PSK remains encrypted. A regression test removes `SubtleCrypto` and still generates a valid X25519 pair. The self-contained portal is 206,150 bytes gzipped, below the 300 KB limit; 11 browser tests, typecheck, portal build, 32 Python tests, Python lint, and dependency audit pass.
 - Part B4 Connect retry observation: the operator reported “it says u are not connectred to spark.. join DGX spark access point and then return.. and u buttons - show join instructions and open in safari.” The iPhone was already hardware-verified as associated, so this `PORTAL_UNREACHABLE` message is false. The app currently maps every unexpected browser exception—not only transport failures—to that code; the plain-HTTP portal then calls secure-context Web Crypto (`crypto.subtle`) for X25519/HKDF/AES-GCM, making browser crypto availability the leading cause under investigation.
@@ -125,6 +126,6 @@
 - Captive-portal cryptography cannot depend on secure-context-only Web Crypto because the AP deliberately serves plain HTTP. The portal uses audited pure-JavaScript primitives for the same X25519/HKDF-SHA256/AES-256-GCM wire protocol; weakening or removing application-layer PSK encryption is rejected.
 
 ## Next
-- Part B4: have the operator reload the existing Safari portal to fetch `4eaaea5`, record the initial screen, then retry Connect as a separate action.
+- Part B4: have the operator tap `Connect` once on the compatibility build and record exactly whether a real network list or an error appears.
 - Continue B2-B8 one action and one observation at a time; do not infer or batch phone outcomes.
 - Keep the non-concurrent handoff and unavailable A6 failure classes explicitly simulation-only. Android chooser/reconnect/cache, SoftAP fallback, candidate sweep, manual IP, and Android `.local` failure remain deferred because no Android device exists for this pass.
