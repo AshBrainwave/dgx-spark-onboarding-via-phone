@@ -28,6 +28,8 @@ NM_SETTINGS = "org.freedesktop.NetworkManager.Settings"
 NM_SETTINGS_CONNECTION = "org.freedesktop.NetworkManager.Settings.Connection"
 NM_AP = "org.freedesktop.NetworkManager.AccessPoint"
 PROPERTIES = "org.freedesktop.DBus.Properties"
+DBUS_BUS = "org.freedesktop.DBus"
+DBUS_PATH = "/org/freedesktop/DBus"
 WIFI_DEVICE_TYPE = 2
 AP_FLAGS_PRIVACY = 0x00000001
 SEC_KEY_MGMT_PSK = 0x00000100
@@ -143,6 +145,16 @@ def _raw_rssi_from_iw(output: str) -> dict[str, float]:
     return readings
 
 
+def _failure_code_from_reason(code: int) -> str:
+    if code in {7, 8, 9, 11, 23, 24, 25}:
+        return "WIFI_AUTH_FAILED"
+    if code in {17, 20, 21}:
+        return "WIFI_SSID_NOT_FOUND"
+    if code in {5, 15, 22}:
+        return "WIFI_DHCP_FAILED"
+    return "WIFI_SSID_NOT_FOUND"
+
+
 class NetworkManagerError(RuntimeError):
     """NetworkManager is missing, unavailable, or does not own the selected radio."""
 
@@ -178,6 +190,7 @@ class NetworkManagerDriver(NetDriver):
         self._ap_interface: str | None = None
         self._ap_device_path: str | None = None
         self._concurrent_ap_sta = False
+        self._failure_reason: int | None = None
 
     @classmethod
     async def create(cls, interface: str | None = None) -> NetworkManagerDriver:
@@ -198,7 +211,45 @@ class NetworkManagerDriver(NetDriver):
                 "Configure NetworkManager to manage the radio before starting sparkd-provision."
             )
         driver._concurrent_ap_sta = await driver._detect_concurrent_ap_sta()
+        await driver._subscribe_state_changes()
         return driver
+
+    async def _subscribe_state_changes(self) -> None:
+        self.bus.add_message_handler(self._state_changed)
+        rule = (
+            f"type='signal',sender='{NM_BUS}',path='{self.device_path}',"
+            f"interface='{NM_DEVICE}',member='StateChanged'"
+        )
+        reply = await self.bus.call(
+            Message(
+                destination=DBUS_BUS,
+                path=DBUS_PATH,
+                interface=DBUS_BUS,
+                member="AddMatch",
+                signature="s",
+                body=[rule],
+            )
+        )
+        if reply.message_type == MessageType.ERROR:
+            raise NetworkManagerError(
+                f"could not subscribe to NetworkManager state changes: {reply.body}"
+            )
+
+    def _state_changed(self, message: Message) -> None:
+        if (
+            message.message_type == MessageType.SIGNAL
+            and message.path == self.device_path
+            and message.interface == NM_DEVICE
+            and message.member == "StateChanged"
+            and len(message.body) == 3
+            and int(message.body[0]) == 120
+        ):
+            self._failure_reason = int(message.body[2])
+            self._status = LinkStatus(
+                phase="failed",
+                ssid=self._status.ssid,
+                err=_failure_code_from_reason(self._failure_reason),
+            )
 
     async def _detect_concurrent_ap_sta(self) -> bool:
         """Read NL80211's wiphy combinations without changing radio state."""
@@ -301,6 +352,7 @@ class NetworkManagerDriver(NetDriver):
     async def connect(self, ssid: str, psk: str, security: str, hidden: bool = False) -> None:
         if security == "wpa2-enterprise":
             raise NetworkManagerError("802.1X is not supported by this provisioning flow")
+        self._failure_reason = None
         self._status = LinkStatus(phase="associating", ssid=ssid)
         wifi: dict[str, Variant] = {"ssid": _ssid_variant(ssid)}
         if hidden:
@@ -328,6 +380,8 @@ class NetworkManagerDriver(NetDriver):
         )
 
     async def status(self) -> LinkStatus:
+        if self._failure_reason is not None:
+            return self._status
         state = int(await self._property(self.device_path, NM_DEVICE, "State"))
         if state == 100:
             config = await self._property(self.device_path, NM_DEVICE, "Ip4Config")
@@ -346,8 +400,11 @@ class NetworkManagerDriver(NetDriver):
         elif state in {40, 50, 80, 90}:
             self._status = LinkStatus(phase="associating", ssid=self._status.ssid)
         elif state == 120:
+            self._failure_reason = await self._state_reason()
             self._status = LinkStatus(
-                phase="failed", ssid=self._status.ssid, err=await self._failure_code()
+                phase="failed",
+                ssid=self._status.ssid,
+                err=_failure_code_from_reason(self._failure_reason),
             )
         return self._status
 
@@ -362,20 +419,12 @@ class NetworkManagerDriver(NetDriver):
         dns = nameservers[0].get("address") if nameservers else None
         return ip, gateway, dns
 
-    async def _failure_code(self) -> str:
-        # NetworkManager's numeric StateReason is intentionally collapsed to the
-        # user-facing vocabulary rather than leaking backend-specific strings.
+    async def _state_reason(self) -> int:
         reason = await self._property(self.device_path, NM_DEVICE, "StateReason")
-        code = int(reason[1]) if isinstance(reason, (list, tuple)) and len(reason) > 1 else 0
-        if code in {7, 8, 9, 11, 23, 24, 25}:
-            return "WIFI_AUTH_FAILED"
-        if code in {17, 20, 21}:
-            return "WIFI_SSID_NOT_FOUND"
-        if code in {5, 15, 22}:
-            return "WIFI_DHCP_FAILED"
-        return "WIFI_SSID_NOT_FOUND"
+        return int(reason[1]) if isinstance(reason, (list, tuple)) and len(reason) > 1 else 0
 
     async def forget(self) -> None:
+        self._failure_reason = None
         self._status = LinkStatus()
 
     async def softap_up(self, ssid: str, psk: str) -> str:

@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
-from dbus_fast import Variant
+from dbus_fast import Message, MessageType, Variant
 
 from sparkd_provision.api.handlers import Handlers
 from sparkd_provision.ble_peripheral import BleProtocolBridge, _decode, _encode
@@ -20,6 +20,7 @@ from sparkd_provision.net.nm_driver import (
     NetworkManagerDriver,
     _channel,
     _deduplicate_networks,
+    _failure_code_from_reason,
     _network_from_properties,
     _raw_rssi_from_iw,
     _ssid_variant,
@@ -316,6 +317,26 @@ BSS 2e:ef:15:d3:99:59(on wlP9s9)
     )
     assert network.rssi == -59
     assert network.bars == 4
+
+
+async def test_networkmanager_failure_signal_latches_wrong_psk() -> None:
+    driver = NetworkManagerDriver(None, "/device/sta", "wlP9s9")
+    driver._status = LinkStatus(phase="associating", ssid="Droid_IoT")
+    driver._state_changed(
+        Message(
+            path="/device/sta",
+            interface="org.freedesktop.NetworkManager.Device",
+            member="StateChanged",
+            message_type=MessageType.SIGNAL,
+            signature="uuu",
+            body=[120, 60, 7],
+        )
+    )
+
+    status = await driver.status()
+    assert status.phase == "failed"
+    assert status.err == "WIFI_AUTH_FAILED"
+    assert _failure_code_from_reason(7) == "WIFI_AUTH_FAILED"
 
 
 def test_hardware_identity_drives_radio_and_handoff_names(tmp_path) -> None:
