@@ -1,8 +1,8 @@
 # DGX Spark Onboarding — Build Status
 
 **Overall:** in_progress
-**Current step:** Part B1 — repaired QR retry reached join prompt; waiting for Join
-**Updated:** 2026-08-02T07:30:10Z
+**Current step:** Part B1/B2 — iPhone reports setup SSID connected; verifying association and portal
+**Updated:** 2026-08-02T07:32:25Z
 
 ## Verification matrix
 
@@ -21,6 +21,7 @@
 - [ ] 8. Hardware networking (`v0.4-hw`)
 
 ## Done since last update
+- Part B1 repaired join observation: the operator reported that iPhone Wi-Fi settings show it connected to `DGX-Spark-3847`, while the status bar still shows 5G rather than the Wi-Fi symbol. Join timing was not reported, and no captive portal was reported yet. This is recorded as the phone-side observation only; Spark-side association and DHCP are being checked before B1 is marked complete.
 - Part B1 repaired retry observation: after scanning the same QR again, the operator reported “ok ready to join?”, confirming the join action is available. Prompt timing was not reported. The operator has not yet reported association or captive-portal behavior.
 - Deployed `7e522ce` from the Mac checkout to the Spark after 31 aarch64 Python tests and lint passed, reinstalled the production package, and restarted the service. The persisted state and live `iw` AP now both report `DGX-Spark-3847`; the live AP password hash still exactly matches the existing QR, channel 6 is active, the default route remains home Wi-Fi, and the service has no warnings. B1 is ready for a controlled retry with the same QR.
 - Diagnosed the B1 association failure before retrying. The QR decoded to `DGX-Spark-3847`, but `iw` and NetworkManager proved the Spark was broadcasting `DGX-Spark-0001`; the QR PSK hash exactly matched the live AP PSK, and the AP station table was empty. WireGuard did not own the default route: home Wi-Fi remained the default via `192.168.68.1`, the setup AP owned only `10.42.0.0/24`, and WireGuard owned only its explicit `10.8.0.0/24` and `10.184.174.0/26` routes. The VPN was not the association failure.
@@ -91,7 +92,7 @@
 
 ## Blocked
 - Nothing blocks simulator work.
-- Part B is intentionally proceeding from one-at-a-time observations from the iPhone operator. The first B1 join failed because of the now-fixed SSID mismatch; the repaired retry reached the join prompt, but no association, captive-portal, or later phone outcome has been inferred.
+- Part B is intentionally proceeding from one-at-a-time observations from the iPhone operator. After the repaired retry, iOS Settings reports association to `DGX-Spark-3847` but the status bar remains on 5G; Spark-side association/DHCP and captive-portal behavior have not yet been inferred.
 - A6 conditions other than wrong PSK remain unrun because this pass has no controllable weak-signal, no-DHCP, no-route, captive-portal, 802.1X, or incompatible-band test networks. Their simulation coverage is not reported as hardware verification.
 - The current custom `DGXSPARK:` enrollment QR contains identity/key material but is not an iOS `WIFI:S:...;T:WPA;P:...;;` join QR. A temporary hardware Wi-Fi QR can validate B1, but the one-scan production enrollment/security UX remains unresolved and must not be represented as finished.
 - No provisioning/reset button or named GPIO line is exposed on this DGX Spark. The GPIO watcher remains simulation-only; the full reset semantics were verified through the root software entry point.
@@ -108,6 +109,6 @@
 - The serial-derived AP SSID is authoritative at hardware startup. An existing state file is migrated to that identity without rotating its PSK; callers that do not provide an identity preserve the existing state's SSID across reset.
 
 ## Next
-- Part B1: have the operator tap Join and record exactly whether iOS associates and whether the captive portal opens.
+- Verify the reported B1 association and DHCP lease from the Spark, then continue B2 one action at a time if the captive portal did not auto-open.
 - Continue B2-B8 one action and one observation at a time; do not infer or batch phone outcomes.
 - Keep the non-concurrent handoff and unavailable A6 failure classes explicitly simulation-only. Android chooser/reconnect/cache, SoftAP fallback, candidate sweep, manual IP, and Android `.local` failure remain deferred because no Android device exists for this pass.
