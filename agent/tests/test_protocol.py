@@ -13,6 +13,7 @@ from sparkd_provision.ble_peripheral import BleProtocolBridge, _decode, _encode
 from sparkd_provision.config import DeviceIdentity
 from sparkd_provision.net import mock_driver
 from sparkd_provision.net.capabilities import supports_concurrent_ap_sta
+from sparkd_provision.net.driver import LinkStatus
 from sparkd_provision.net.mock_driver import MockDriver
 from sparkd_provision.net.nm_driver import (
     NetworkManagerDriver,
@@ -472,3 +473,13 @@ async def test_factory_reset_reopens_window_rotates_ap_and_restores_recovery_ap(
     assert state.state.ap_psk != old_password
     assert driver.ap_up_calls == 1
     assert state_path.stat().st_mode & 0o777 == 0o600
+
+
+async def test_existing_management_wifi_does_not_flip_captive_probes_online() -> None:
+    driver = MockDriver()
+    driver._status = LinkStatus(phase="online", ssid="management", ip="192.168.68.87")
+    handlers = Handlers(driver)
+
+    assert await handlers.provisioning_online() is False
+    handlers._connect_requested = True
+    assert await handlers.provisioning_online() is True

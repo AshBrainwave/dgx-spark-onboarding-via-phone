@@ -41,6 +41,7 @@ class Handlers:
         self.connect_attempts = 0
         self.next_connect_at: datetime | None = None
         self._handoff_task: asyncio.Task[None] | None = None
+        self._connect_requested = False
 
     async def handle(self, request: dict[str, Any]) -> dict[str, Any]:
         message_id = request.get("id", "")
@@ -122,6 +123,7 @@ class Handlers:
                     "claim_token": secrets.token_urlsafe(24),
                 }
                 await self.driver.softap_down()
+            self._connect_requested = True
             await self.driver.connect(ssid, psk, body.get("security", "wpa2-psk"), bool(body.get("hidden")))
             if handoff:
                 self._handoff_task = asyncio.create_task(self._recover_ap_after_failed_handoff())
@@ -140,6 +142,7 @@ class Handlers:
             return response(message_id, status.__dict__)
         if op == "wifi.forget":
             await self.driver.forget()
+            self._connect_requested = False
             return response(message_id, {})
         if op == "device.claim":
             self.owner_token = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode().rstrip("=")
@@ -163,13 +166,14 @@ class Handlers:
             self._handoff_task = None
         self._release_session()
         self.state.reset()
+        self._connect_requested = False
         await self.driver.forget()
         # This is intentionally independent of AP+STA capability: after a reset the
         # device must be discoverable even when its old LAN profile has disappeared.
         await self.driver.softap_up(self.state.state.ap_ssid, self.state.state.ap_psk)
 
     async def provisioning_online(self) -> bool:
-        return (await self.driver.status()).phase == "online"
+        return self._connect_requested and (await self.driver.status()).phase == "online"
 
     def _release_session(self) -> None:
         self.sid = None
