@@ -1,14 +1,14 @@
 # DGX Spark Onboarding — Build Status
 
 **Overall:** in_progress
-**Current step:** Part A6 — map real NetworkManager failures
-**Updated:** 2026-08-02T00:38:34Z
+**Current step:** Part D — physical reset and first-boot/state recovery
+**Updated:** 2026-08-02T05:57:24Z
 
 ## Verification matrix
 
 | Verified on hardware | Verified in simulation only | Deferred (no Android) |
 | --- | --- | --- |
-| Spark aarch64/Python 3.12 portability gate; A1 NetworkManager ownership and AP+STA parser; Wi-Fi/Bluetooth rfkill state; A2 concurrent WPA2 SoftAP visibility/association/DHCP/AP address/NAT/STA preservation/PSK alphabet; A3 captive DNS/HTTP probes/catch-all/embedded portal/startup-shutdown cleanup; A4 forced-scan generation/raw dBm/bars/dedup/bands/6 GHz/security/hidden handling; A5 HTTP X25519/HKDF/AES-GCM join/association/DHCP/status/concurrent-AP preservation; Mac CoreBluetooth permission/preflight. | Protocol crypto/framing, mock driver, app FSM/screens/error routes, simulator, BlueZ bridge, mDNS publisher, handoff recovery, lifecycle/reset logic, BLE central probe framing/codec self-test. | Chrome Web Bluetooth chooser, user-gesture handling, Location Services prompt, Chrome reconnect/service-cache behaviour, and Android SoftAP fallback/`.local` resolution. |
+| Spark aarch64/Python 3.12 portability gate; A1 NetworkManager ownership and AP+STA parser; Wi-Fi/Bluetooth rfkill state; A2 concurrent WPA2 SoftAP visibility/association/DHCP/AP address/NAT/STA preservation/PSK alphabet; A3 captive DNS/HTTP probes/catch-all/embedded portal/startup-shutdown cleanup; A4 forced-scan generation/raw dBm/bars/dedup/bands/6 GHz/security/hidden handling; A5 HTTP X25519/HKDF/AES-GCM join/association/DHCP/status/concurrent-AP preservation; A6 wrong-PSK mapping; Mac CoreBluetooth permission/preflight; BlueZ advertisement/GATT bridge; BLE central probe C1-C5 including framing, encrypted provisioning, and negative paths. | Protocol crypto/framing, mock driver, app FSM/screens/error routes, simulator, mDNS publisher, handoff recovery, lifecycle/reset logic. | Chrome Web Bluetooth chooser, user-gesture handling, Location Services prompt, Chrome reconnect/service-cache behaviour, and Android SoftAP fallback/`.local` resolution. |
 
 ## Milestones
 - [x] 1. Repo skeleton + CI — clean-clone Python and browser test commands passed
@@ -21,6 +21,10 @@
 - [ ] 8. Hardware networking (`v0.4-hw`)
 
 ## Done since last update
+- C1-C5 pass between this Mac's CoreBluetooth central and the Spark's real BlueZ peripheral. The advertisement contained the required 128-bit service UUID and local name `DGX Spark 3847` at -57 to -63 dBm; GATT exposed the required RX/TX/INFO properties; the INFO serial/public key matched framed `device.info`; an incomplete request produced `BLE_REASSEMBLY_TIMEOUT` after 10.3 seconds; a 36-network scan returned 1,340 encoded bytes over 84 notification fragments; invalid ciphertext returned `INVALID_CIPHERTEXT`; and the peripheral stayed connected.
+- Fixed the first real BLE defect (`c2cb229`): every RX fragment reached the Spark over ATT, but BlueZ emitted no notification because CTRL_TX signalled `Value` without exporting that GATT property. CTRL_TX now owns a read-only `Value` property and updates it before `PropertiesChanged`; the identical hardware probe then passed.
+- C4 encrypted provisioning passes entirely over BLE. The probe opened a fresh X25519/HKDF session, encrypted the already-saved `Droid_IoT` credential with AES-GCM, and sent it without printing, logging, or placing it on a command line. The Spark reported `associating`, `dhcp`, then `online` at `192.168.68.87`; the guarded recovery timer was cancelled. Added explicit secure-stdin support to the reusable probe (`7a1221b`).
+- A6 wrong-PSK passes on hardware at `1781cb1`: wpa_supplicant reported `WRONG_KEY`, NetworkManager ended with reason `no-secrets`, and the API latched the transient failure as `failed/WIFI_AUTH_FAILED` instead of losing it when the device returned to disconnected. Other synthetic A6 network conditions remain unrun; they are not implied by this result.
 - A5 passes on hardware: the Mac opened a real X25519/HKDF session, asserted that the WPA2 password was absent from the serialized request, and sent only AES-GCM ciphertext. NetworkManager deauthenticated and reassociated `wlP9s9` to `Droid_IoT`, completed WPA key negotiation and a fresh DHCP transaction, and activated persisted profile `DGX provisioning Droid_IoT` (`163eb85c-a546-44f4-a6d0-6a175a2170de`). The API reported `online`, IP `192.168.68.87`, gateway `192.168.68.1`, DNS `75.75.75.75`, and RSSI -70; `wlP9s9-ap` remained active on channel 6. The guarded recovery timer was cancelled.
 - The first A5 session correctly returned `SESSION_EXPIRED` because the 15-minute provisioning window had elapsed; no credential or radio mutation occurred. Added and tested `StateStore.reopen()` (`84fded6`) so the physical-button/software-entry path can extend the window without rotating the AP password. The persisted window was reopened through that API before the successful retry; full reset/rotation remains Part D.
 - A4 passes on hardware at `4365ea2`: a forced D-Bus scan advanced `LastScan` from 82,385,591 to 82,399,790 and completed in 1.54 seconds. The normalized result contained 37 entries (18 named, 19 hidden); 29 retained BSSIDs had kernel scan-cache measurements and every reported integer dBm matched the kernel value exactly with zero mismatches. `Droid` deduped 2.4/5/6 GHz at -59 dBm; `Droid_Guest_6GHz` was WPA3/6 GHz; `Xfinity Mobile` was explicitly unsupported 802.1X; and `xfinitywifi` was open.

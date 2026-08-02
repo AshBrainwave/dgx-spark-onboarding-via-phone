@@ -315,6 +315,8 @@ def validate_info(raw: bytes) -> dict[str, Any]:
 
 
 async def run_probe(args: argparse.Namespace) -> None:
+    if args.provision and args.factory_reset:
+        raise ProbeError("--provision and --factory-reset are mutually exclusive")
     BleakClient, _, BleakError = _load_bleak()
     device, advertisement = await discover_target(args.scan_timeout, args.address)
     verify_advertisement(device, advertisement)
@@ -430,6 +432,17 @@ async def run_probe(args: argparse.Namespace) -> None:
                     "PASS C5 truncated ciphertext: INVALID_CIPHERTEXT, no disconnect or crash"
                 )
 
+            if args.factory_reset:
+                reset, _, _ = await transport.send(
+                    request("factory-reset", "device.factory_reset", sid, {}),
+                    timeout=args.request_timeout,
+                )
+                require_ok(reset, "device.factory_reset")
+                print(
+                    "PASS D software factory reset accepted over BLE after clearing the active session"
+                )
+                return
+
             if not args.provision:
                 print(
                     "SKIP C4 provisioning: rerun with --provision --ssid <network> to perform the real join"
@@ -522,6 +535,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--provision", action="store_true", help="perform encrypted real-network join"
+    )
+    parser.add_argument(
+        "--factory-reset",
+        action="store_true",
+        help="invoke the recovery-safe reset through the authenticated BLE session",
     )
     parser.add_argument("--ssid")
     parser.add_argument(
