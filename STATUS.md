@@ -1,8 +1,8 @@
 # DGX Spark Onboarding — Build Status
 
 **Overall:** in_progress
-**Current step:** Part B4 — `Droid_IoT` password screen rendered; waiting for local entry
-**Updated:** 2026-08-02T16:59:40Z
+**Current step:** Part B4 — password entered locally; waiting for encrypted submission
+**Updated:** 2026-08-02T17:00:44Z
 
 ## Verification matrix
 
@@ -21,6 +21,7 @@
 - [ ] 8. Hardware networking (`v0.4-hw`)
 
 ## Done since last update
+- Part B4 local credential-entry observation: the operator reported “yes enabled,” confirming that the password was entered on the iPhone and the submission control became available. The credential was not shared with or observed by the orchestrator. At verification, the iPhone remained associated and 753 seconds of the 900-second window had elapsed; no submission outcome is inferred.
 - Part B4 SSID-selection observation: after selecting `Droid_IoT`, the operator reported that the app is “asking to enter password.” The password screen therefore follows the selected real SSID as expected. No credential has been shared with the orchestrator, and no connect request or applying outcome is inferred.
 - Part B4 secure portal and scan pass on iPhone after `4eaaea5`. The operator reported “yes, i see all avaible wifi ssids”; the Spark still showed the iPhone authorized and associated. This proves the browser completed the application-layer secure session and rendered real hardware scan results without secure-context Web Crypto. Scan rendering time and per-network signal-bar accuracy were not separately reported; SSID selection, password entry, applying substeps, and success remain unrun.
 - Part B4 compatibility-page observation: after reloading, the operator reported “connectAND OPEN IN safari,” confirming the refreshed portal again shows `Connect` and `Open in Safari`. At verification the iPhone remained authorized/associated and the setup window was 533 seconds old, leaving about six minutes; the Connect outcome is not inferred.
@@ -128,6 +129,6 @@
 - Captive-portal cryptography cannot depend on secure-context-only Web Crypto because the AP deliberately serves plain HTTP. The portal uses audited pure-JavaScript primitives for the same X25519/HKDF-SHA256/AES-256-GCM wire protocol; weakening or removing application-layer PSK encryption is rejected.
 
 ## Next
-- Part B4: have the operator enter the `Droid_IoT` password locally on the iPhone, without sharing it, and record whether the submission control becomes available.
+- Part B4: have the operator submit the locally entered password and record the first Applying substep or exact error.
 - Continue B2-B8 one action and one observation at a time; do not infer or batch phone outcomes.
 - Keep the non-concurrent handoff and unavailable A6 failure classes explicitly simulation-only. Android chooser/reconnect/cache, SoftAP fallback, candidate sweep, manual IP, and Android `.local` failure remain deferred because no Android device exists for this pass.
