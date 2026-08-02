@@ -15,7 +15,12 @@ from sparkd_provision.config import DeviceIdentity
 from sparkd_provision.net import mock_driver
 from sparkd_provision.net.capabilities import supports_concurrent_ap_sta
 from sparkd_provision.net.driver import LinkStatus
-from sparkd_provision.net.mdns import AVAHI_GROUP, AVAHI_SERVER, MdnsPublisher
+from sparkd_provision.net.mdns import (
+    AVAHI_GROUP,
+    AVAHI_PUBLISH_NO_REVERSE,
+    AVAHI_SERVER,
+    MdnsPublisher,
+)
 from sparkd_provision.net.mock_driver import MockDriver
 from sparkd_provision.net.nm_driver import (
     NetworkManagerDriver,
@@ -561,7 +566,13 @@ async def test_mdns_publishes_resolvable_alias_on_production_port() -> None:
             AVAHI_GROUP,
             "AddAddress",
             "iiuss",
-            [-1, -1, 0, "dgx-spark-3847.local", "192.168.68.87"],
+            [
+                -1,
+                -1,
+                AVAHI_PUBLISH_NO_REVERSE,
+                "dgx-spark-3847.local",
+                "192.168.68.87",
+            ],
         ),
         (
             "/Client1/EntryGroup1",

@@ -8,6 +8,7 @@ from dbus_fast.aio import MessageBus
 AVAHI_BUS = "org.freedesktop.Avahi"
 AVAHI_SERVER = "org.freedesktop.Avahi.Server"
 AVAHI_GROUP = "org.freedesktop.Avahi.EntryGroup"
+AVAHI_PUBLISH_NO_REVERSE = 16
 
 
 class MdnsPublisher:
@@ -30,7 +31,7 @@ class MdnsPublisher:
             AVAHI_GROUP,
             "AddAddress",
             "iiuss",
-            [-1, -1, 0, hostname, address],
+            [-1, -1, AVAHI_PUBLISH_NO_REVERSE, hostname, address],
         )
         await self._call(
             group,
