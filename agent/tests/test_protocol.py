@@ -1,6 +1,7 @@
 import asyncio
 import json
 import random
+import re
 import struct
 import time
 from pathlib import Path
@@ -24,7 +25,7 @@ from sparkd_provision.net.nm_driver import (
     _unbox,
 )
 from sparkd_provision.portal.dns import answer_a_query
-from sparkd_provision.portal.server import _is_bound_host
+from sparkd_provision.portal.server import _is_bound_host, _portal_html
 from sparkd_provision.protocol.crypto import (
     b64url,
     decrypt_psk,
@@ -412,6 +413,15 @@ def test_captive_catch_all_accepts_default_port_host() -> None:
     assert _is_bound_host("10.42.0.1", "10.42.0.1", 80)
     assert _is_bound_host("10.42.0.1:80", "10.42.0.1", 80)
     assert not _is_bound_host("captive.apple.com", "10.42.0.1", 80)
+
+
+def test_embedded_portal_is_self_contained() -> None:
+    html = _portal_html()
+    assert '<div id="root"></div>' in html
+    assert '<script type="module">' in html
+    assert "http://127.0.0.1:8080" not in html
+    markup = re.sub(r"<(?:script|style)\b[\s\S]*?</(?:script|style)>", "", html)
+    assert not re.search(r'\b(?:src|href)=["\'](?:https?:|/|\./assets/)', markup)
 
 
 def test_networkmanager_nested_variants_are_unboxed() -> None:

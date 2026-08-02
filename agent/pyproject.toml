@@ -18,6 +18,9 @@ probe = ["bleak>=3,<4"]
 # browser-developer installs.  Hardware images enable this extra.
 hardware = ["gpiod>=2.2"]
 
+[tool.setuptools.package-data]
+sparkd_provision = ["portal/static/index.html"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 pythonpath = ["."]

@@ -19,6 +19,7 @@ import "./style.css";
 
 const client = new Client(new HttpTransport());
 const bleTransport = new BleTransport();
+const portalMode = import.meta.env.MODE === "portal";
 type Screen = "welcome" | "qr" | "join" | "connecting" | "networks" | "password" | "applying" | "reconnect" | "success" | "error";
 const knownError = (value: string): ErrorCode => value in errorCopy ? value as ErrorCode : "PORTAL_UNREACHABLE";
 
@@ -26,7 +27,7 @@ function App() {
   const params = new URLSearchParams(location.search);
   const devScreen = params.get("screen") as Screen | null;
   const devError = params.get("error");
-  const [screen, setScreen] = useState<Screen>(devScreen ?? "welcome");
+  const [screen, setScreen] = useState<Screen>(devScreen ?? (portalMode ? "connecting" : "welcome"));
   const [networks, setNetworks] = useState<Network[]>([]);
   const [selected, setSelected] = useState<Network | null>(null);
   const [scannedAt, setScannedAt] = useState("");
@@ -139,6 +140,7 @@ function App() {
   }, [route, networks, scannedAt, phase, elapsed, error, ip, selected]);
   return <main>
     {content}
+    {portalMode && <p><a className="button" href={location.href} target="_blank" rel="noreferrer">Open in Safari</a></p>}
     <p className="dev-links">
       Review routes: {(["welcome", "qr", "join", "connecting", "networks", "password", "applying", "reconnect", "success", "error"] as Screen[]).map(name => <a key={name} href={`?screen=${name}`}>{name}</a>)}
     </p>
