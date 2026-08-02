@@ -1,14 +1,14 @@
 # DGX Spark Onboarding — Build Status
 
 **Overall:** in_progress
-**Current step:** Part B4 — compatibility build loaded; waiting for Connect retry
-**Updated:** 2026-08-02T16:57:04Z
+**Current step:** Part B4 — real iPhone Wi-Fi scan rendered; waiting for home SSID selection
+**Updated:** 2026-08-02T16:58:04Z
 
 ## Verification matrix
 
 | Verified on hardware | Verified in simulation only | Deferred (no Android) |
 | --- | --- | --- |
-| Spark aarch64/Python 3.12 portability gate; A1 NetworkManager ownership and AP+STA parser; Wi-Fi/Bluetooth rfkill state; A2 concurrent WPA2 SoftAP visibility/association/DHCP/AP address/NAT/STA preservation/PSK alphabet; A3 captive DNS/HTTP probes/catch-all/embedded portal/startup-shutdown cleanup; A4 forced-scan generation/raw dBm/bars/dedup/bands/6 GHz/security/hidden handling; A5 HTTP X25519/HKDF/AES-GCM join/association/DHCP/status/concurrent-AP preservation; A6 wrong-PSK mapping; A7 Avahi alias/service publication and Mac `.local` resolution; A8 concurrent handoff acknowledgement/AP teardown; A9 online captive-probe responses; B1 iPhone Wi-Fi QR prompt/one-tap association/DHCP; Mac CoreBluetooth permission/preflight; BlueZ advertisement/GATT/window lifecycle; BLE central probe C1-C5; systemd boot/SIGKILL recovery; durable state/window/claim/backoff/rate-limit/root-reset lifecycle. | Protocol crypto/framing, mock driver, app FSM/screens/error routes, simulator, non-concurrent handoff recovery, and the GPIO button watcher (no provisioning/reset button is exposed on this Spark). | Chrome Web Bluetooth chooser, user-gesture handling, Location Services prompt, Chrome reconnect/service-cache behaviour, Android SoftAP fallback, Android Chrome `.local` failure, candidate-IP sweep, and manual-IP fallback. |
+| Spark aarch64/Python 3.12 portability gate; A1 NetworkManager ownership and AP+STA parser; Wi-Fi/Bluetooth rfkill state; A2 concurrent WPA2 SoftAP visibility/association/DHCP/AP address/NAT/STA preservation/PSK alphabet; A3 captive DNS/HTTP probes/catch-all/embedded portal/startup-shutdown cleanup; A4 forced-scan generation/raw dBm/bars/dedup/bands/6 GHz/security/hidden handling; A5 HTTP X25519/HKDF/AES-GCM join/association/DHCP/status/concurrent-AP preservation; A6 wrong-PSK mapping; A7 Avahi alias/service publication and Mac `.local` resolution; A8 concurrent handoff acknowledgement/AP teardown; A9 online captive-probe responses; B1 iPhone Wi-Fi QR prompt/one-tap association/DHCP; B4 iPhone secure portal session and real Wi-Fi scan rendering; Mac CoreBluetooth permission/preflight; BlueZ advertisement/GATT/window lifecycle; BLE central probe C1-C5; systemd boot/SIGKILL recovery; durable state/window/claim/backoff/rate-limit/root-reset lifecycle. | Protocol crypto/framing, mock driver, app FSM/screens/error routes, simulator, non-concurrent handoff recovery, and the GPIO button watcher (no provisioning/reset button is exposed on this Spark). | Chrome Web Bluetooth chooser, user-gesture handling, Location Services prompt, Chrome reconnect/service-cache behaviour, Android SoftAP fallback, Android Chrome `.local` failure, candidate-IP sweep, and manual-IP fallback. |
 
 ## Milestones
 - [x] 1. Repo skeleton + CI — clean-clone Python and browser test commands passed
@@ -21,6 +21,7 @@
 - [ ] 8. Hardware networking (`v0.4-hw`)
 
 ## Done since last update
+- Part B4 secure portal and scan pass on iPhone after `4eaaea5`. The operator reported “yes, i see all avaible wifi ssids”; the Spark still showed the iPhone authorized and associated. This proves the browser completed the application-layer secure session and rendered real hardware scan results without secure-context Web Crypto. Scan rendering time and per-network signal-bar accuracy were not separately reported; SSID selection, password entry, applying substeps, and success remain unrun.
 - Part B4 compatibility-page observation: after reloading, the operator reported “connectAND OPEN IN safari,” confirming the refreshed portal again shows `Connect` and `Open in Safari`. At verification the iPhone remained authorized/associated and the setup window was 533 seconds old, leaving about six minutes; the Connect outcome is not inferred.
 - Deployed `4eaaea5` after the Spark's 32 Python tests and lint passed. The production service and `DGX-Spark-3847` AP returned cleanly; the setup window was 457 seconds old, leaving roughly seven minutes. The iPhone automatically re-associated, authenticated, and renewed `10.42.0.148`. The operator-facing pure-JavaScript crypto path has not yet been rerun.
 - Replaced the portal's secure-context-only `crypto.subtle` dependency with audited, browser-native JavaScript primitives from Noble: X25519, HKDF-SHA256, and AES-256-GCM. The byte-level protocol is unchanged: existing Python-produced vectors still match exactly, SSID remains AES-GCM AAD, and the PSK remains encrypted. A regression test removes `SubtleCrypto` and still generates a valid X25519 pair. The self-contained portal is 206,150 bytes gzipped, below the 300 KB limit; 11 browser tests, typecheck, portal build, 32 Python tests, Python lint, and dependency audit pass.
@@ -126,6 +127,6 @@
 - Captive-portal cryptography cannot depend on secure-context-only Web Crypto because the AP deliberately serves plain HTTP. The portal uses audited pure-JavaScript primitives for the same X25519/HKDF-SHA256/AES-256-GCM wire protocol; weakening or removing application-layer PSK encryption is rejected.
 
 ## Next
-- Part B4: have the operator tap `Connect` once on the compatibility build and record exactly whether a real network list or an error appears.
+- Part B4: have the operator select the home SSID `Droid_IoT` and record exactly whether the password screen names that SSID.
 - Continue B2-B8 one action and one observation at a time; do not infer or batch phone outcomes.
 - Keep the non-concurrent handoff and unavailable A6 failure classes explicitly simulation-only. Android chooser/reconnect/cache, SoftAP fallback, candidate sweep, manual IP, and Android `.local` failure remain deferred because no Android device exists for this pass.
