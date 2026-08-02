@@ -24,6 +24,7 @@ from sparkd_provision.net.nm_driver import (
     _unbox,
 )
 from sparkd_provision.portal.dns import answer_a_query
+from sparkd_provision.portal.server import _is_bound_host
 from sparkd_provision.protocol.crypto import (
     b64url,
     decrypt_psk,
@@ -405,6 +406,12 @@ def test_captive_dns_answers_any_a_query_with_ap_address() -> None:
     response = answer_a_query(query, b"\xc0\x00\x02\x01")
     assert response is not None
     assert response[-4:] == b"\xc0\x00\x02\x01"
+
+
+def test_captive_catch_all_accepts_default_port_host() -> None:
+    assert _is_bound_host("10.42.0.1", "10.42.0.1", 80)
+    assert _is_bound_host("10.42.0.1:80", "10.42.0.1", 80)
+    assert not _is_bound_host("captive.apple.com", "10.42.0.1", 80)
 
 
 def test_networkmanager_nested_variants_are_unboxed() -> None:

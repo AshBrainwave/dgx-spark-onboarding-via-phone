@@ -6,6 +6,15 @@ from cryptography.exceptions import InvalidTag
 from sparkd_provision.api.handlers import Handlers
 
 
+def _is_bound_host(request_host: str, bound_host: str | None, bound_port: int | None) -> bool:
+    if not bound_host or not bound_port:
+        return False
+    expected = {f"{bound_host}:{bound_port}"}
+    if bound_port == 80:
+        expected.add(bound_host)
+    return request_host.lower() in {host.lower() for host in expected}
+
+
 def create_app(handlers: Handlers) -> web.Application:
     app = web.Application()
 
@@ -50,8 +59,7 @@ def create_app(handlers: Handlers) -> web.Application:
     async def catch_all(request: web.Request) -> web.Response:
         sockname = request.transport.get_extra_info("sockname") if request.transport else None
         bound_host, bound_port = sockname[:2] if sockname else (None, None)
-        expected_host = f"{bound_host}:{bound_port}" if bound_host and bound_port else None
-        if request.host != expected_host:
+        if not _is_bound_host(request.host, bound_host, bound_port):
             raise web.HTTPFound("/portal/")
         raise web.HTTPNotFound()
 
